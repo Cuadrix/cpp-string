@@ -13,6 +13,7 @@ A simple and fast C++ string class implementation.
   - good performance 
   - iterators
   - handy template usage (char, wchar_t, char16_t, char32_t)
+  - C++98 compatibility 
 
 
 3. [F U N C T I O N S]<br>
