@@ -48,3 +48,4 @@
 *.vcxproj
 *.filters
 *.user
+*.cpp

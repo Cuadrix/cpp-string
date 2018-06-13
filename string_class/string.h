@@ -1,7 +1,7 @@
 /*
 *******************************************
 *** C++ string class
-*** written by budspencer1 in 06, 2018
+*** written by cocoz1 in 06, 2018
 *** features a simple (header-only) C++ string class which implements most of std::basic_string's functionalities
 *** If you find any bugs in my code and want to contribute, please leave an issue on github.
 *** ----> You can also suggest new features or better implementations of single functions, anything is appreciated.
@@ -24,7 +24,7 @@
 ***			Might be also used as a reference or an inspiration for future implementations of such a class
 ***			Besides that, it can be well used as an alternative to std::basic_string;
 ***
-*** (C) 2018 budspencer1, All rights reserved.
+*** (C) 2018 cocoz1, All rights reserved.
 *******************************************
 */
 
