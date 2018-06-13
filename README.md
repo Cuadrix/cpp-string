@@ -60,4 +60,8 @@ A simple and fast C++ string class implementation.
   
   
 ### [C O N T R I B U T E]<br>
+<<<<<<< HEAD
   Any kind of criticism is appreciated as long as it's contructive and not offensive in any way. You can give me any advices or hints to find bugs; you may also request new features or suggest better implementations of single functions. 
+=======
+  Any kind of criticism is appreciated as long as it's contructive and not offensive in any way. You can give me any advices or hints to find bugs; you may also request new features or suggest better implementations of single functions. 
+>>>>>>> 386fc8fd961784cc91c9cfaae830a6688b9ca653
