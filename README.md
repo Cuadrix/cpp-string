@@ -1,4 +1,4 @@
-# cpp-string-class
+# C++ - String
 A simple and fast C++ string class implementation.
 
 
