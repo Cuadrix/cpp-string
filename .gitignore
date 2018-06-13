@@ -30,3 +30,21 @@
 *.exe
 *.out
 *.app
+
+# anything else I don't want
+*.ilk
+*.pdb
+*.iobj
+*.ipdb
+*.sln
+*.i
+*.enc
+*.log
+*.tlog
+*.lastbuildstate
+*.idb
+*.asm
+*.cod
+*.vcxproj
+*.filters
+*.user
