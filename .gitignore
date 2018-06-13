@@ -49,3 +49,7 @@
 *.filters
 *.user
 *.cpp
+*.suo
+*.db
+*.opendb
+*.ipch
