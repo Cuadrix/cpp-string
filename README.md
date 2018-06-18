@@ -26,7 +26,7 @@ A simple and fast C++ string class implementation.
   capacity()        // returns string's capacity
   cbegin()          // returns constant iterator to the beginning
   cend()            // returns constant iterator to the ending
-  cleanup()			// deallocate string, use this function as a replacement of "delete"
+  cleanup()         // deallocate string, use this function as a replacement of "delete"
   clear()           // clear string (destroy content)
   compare()         // compare string to other strings (or sequences)
   c_str()           // return C-String value
@@ -62,4 +62,3 @@ A simple and fast C++ string class implementation.
   
 ### [C O N T R I B U T E]<br>
   Any kind of criticism is appreciated as long as it's contructive and not offensive in any way. You can give me any advices or hints to find bugs; you may also request new features or suggest better implementations of single functions. 
-
