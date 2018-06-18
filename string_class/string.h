@@ -49,11 +49,22 @@
 
 #include <memory.h> /* for realloc(void *, unsigned) */
 
-/* default string capacity (for standard constructor and so on) [def: 8] */
-#define DEF_STRCAP 8 
+/* 
+*** default string capacity;
+*** (for standard constructor and so on) [def: 32] 
+*** Version 1.1: def(8) -> def(32)
+*/
+#define DEF_STRCAP 32
 /* allocate DEF_ALLOC * sizeof(T) more space if required 
 (It's a high number to minimize reallocations in program) [def: 8192] */
 #define DEF_ALLOC 8192
+
+/* 
+*** string version;
+*** can be used to check compatibility or for an outdated version 
+*** Macro added with version 1.1
+*/
+#define STR_VERSION "1.1" 
 
 #ifndef NULL
 	#define NULL 0
@@ -153,14 +164,6 @@ namespace str {
 		explicit string_base<T>(const string_base<T> &str, unsigned start, unsigned count) {
 			unsigned c = count;
 			unsigned l = str.length();
-			if (start > l) {
-				/* perform a standard allocation */
-				raw_data = new T[DEF_STRCAP];
-				raw_data[0] = 0x00;
-				cap = DEF_STRCAP;
-				len = 0;
-				return;
-			}
 			if ((start + c) > l) c = (l - start);
 			len = c; cap = len + 1;
 			raw_data = new T[cap];
@@ -173,36 +176,16 @@ namespace str {
 		(starting at position "start2 with a length of "count")
 		*** allocate enough space ("count" + 1)
 		*** automatically inserts null-terminator at the end
-		*** if c_str == NULL, it performs a default allocation
 		*/
 		explicit string_base<T>(const T *c_str, unsigned start, unsigned count) {
 			unsigned c = count;
 			unsigned l = strlength<T>(c_str);
-			if (!*c_str) goto INVALID;
-			if (start > l) {
-			/* perform a standard allocation */
-			INVALID:
-				raw_data = new T[DEF_STRCAP];
-				raw_data[0] = 0x00;
-				cap = DEF_STRCAP;
-				len = 0;
-				return;
-			}
 			if ((start + c) > l) c = (l - start);
 			len = c; cap = len + 1;
 			raw_data = new T[cap];
 			for (unsigned i = 0; i < c; i++)
 				raw_data[i] = c_str[start + i];
 			raw_data[len] = 0x00;
-		}
-		/*
-		*** destructor
-		*** frees memory if called
-		*/
-		~string_base<T>() {
-			delete[] raw_data;
-			/* C++98 support by avoiding nullptr */
-			raw_data = NULL; 
 		}
 
 		T *data() const { return raw_data; } /* returns C-String value */
@@ -1331,12 +1314,14 @@ namespace str {
 			a.swap(b); 
 			// a is now "Apple" and b is now "Pear"
 		*** performs an assign operation internally
+		*** Version 1.1: change function to use memcpy()
 		*/
 		void swap(string_base<T> &value) {
 			if (this == &value) return;
-			string_base<T> tmp(value);
-			value.assign(*this);
-			assign(tmp);
+			string_base<T> tmp;
+			memcpy(&tmp, &value, sizeof(string_base<T>));
+			memcpy(&value, this, sizeof(string_base<T>));
+			memcpy(this, &tmp, sizeof(string_base<T>));
 		}
 		/* 
 		*** void reverse()
@@ -1403,6 +1388,20 @@ namespace str {
 			raw_data = new T[DEF_STRCAP];
 			raw_data[0] = 0x00;
 			len = 0; cap = DEF_STRCAP;
+		}
+
+		/*
+		*** void cleanup()
+		*** Version 1.1: add this function and delete default destructor 
+		*** custom destructor you can call if you 
+		want to deallocate the memory used by this string object
+		*** All data is lost when calling this 
+		*/
+		void cleanup() {
+			delete[] raw_data;
+			/* C++98 support by avoiding nullptr */
+			raw_data = NULL;
+			delete this;
 		}
 
 		/*
