@@ -10,7 +10,7 @@ A simple and fast C++ string class implementation.
 
 ### [F E A T U R E S]<br>
   - easy usage
-  - good performance 
+  - nice performance 
   - iterators
   - handy template usage (char, wchar_t, char16_t, char32_t)
   - C++98 compatibility 
@@ -26,6 +26,7 @@ A simple and fast C++ string class implementation.
   capacity()        // returns string's capacity
   cbegin()          // returns constant iterator to the beginning
   cend()            // returns constant iterator to the ending
+  cleanup() 		// deallocate string, use this function as a replacement of "delete"
   clear()           // clear string (destroy content)
   compare()         // compare string to other strings (or sequences)
   c_str()           // return C-String value
@@ -56,7 +57,7 @@ A simple and fast C++ string class implementation.
   
   
 ### [P E R F O R M A N C E]<br>
-  The performance is - overall - pretty good. It's on a good niveau with std::basic_string and sometimes even faster. Actually, if anyone has suggestions for better performance, please don't be shy and tell me. :)
+  The performance is quite good. It's on a good niveau with std::basic_string and sometimes even faster. Actually, if anyone has suggestions for better performance, please don't be shy and tell me. :)
   
   
 ### [C O N T R I B U T E]<br>

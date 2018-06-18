@@ -38,6 +38,39 @@
 *****************************************************************************
 */
 
+/*
+==============================================
+=== Version Log							   ===
+==============================================
+
+*** 1.0: 
+	initial release, featuring a full-sized string class implementation
+	performance => okay - good
+*** 1.1:
+	some minor fixes
+		-> remove default destructor and replace it with custom one
+		-> add version number macro
+		-> changed default capacity from 8 to 32
+	performance => okay - good
+*** 1.2:
+	Optimization; using memory functions to edit string object
+	some minor things
+		-> added DEF_LARGESTRING macro to choose whether between large and small string optimization
+		-> added constructor for c-string substrings 
+		-> fixes some crashy code
+	added "Version Log" table
+	added "TODO" list
+	increased performance of implementation by many times 
+*/
+
+/*
+==============================================
+=== TODO								   ===
+==============================================
+
+*** 1.3: exceptions
+*/
+
 
 /* avoid this header file being included multiple times */
 #pragma once		
@@ -47,7 +80,12 @@
 
 #ifdef __cplusplus /* only include this class in a C++ project */
 
-#include <memory.h> /* for realloc(void *, unsigned) */
+/*
+*** include this header for several functions 
+*** such as memcpy(), memset() and memmove()
+*/
+#include <memory.h>
+#include <stdlib.h> /* include stdlib.h for realloc() function */
 
 /* 
 *** default string capacity;
@@ -55,16 +93,31 @@
 *** Version 1.1: def(8) -> def(32)
 */
 #define DEF_STRCAP 32
-/* allocate DEF_ALLOC * sizeof(T) more space if required 
+
+/*
+*** DEF_LARGESTRING is a setting to optimize 
+capacity allocation for large or for smaller strings
+*** DEF_LARGESTRING > 1 => large string optimization 
+*** DEF_LARGESTRING < 1 => small string optimization 
+***
+*** default: DEF_LARGESTRING 0
+*/
+#define DEF_LARGESTRING 0
+/* allocate DEF_ALLOC * sizeof(T) more space if required
 (It's a high number to minimize reallocations in program) [def: 8192] */
-#define DEF_ALLOC 8192
+#if (defined DEF_LARGESTRING && DEF_LARGESTRING > 0)
+	#define DEF_ALLOC 16384
+#else 
+	#define DEF_ALLOC 8192
+#endif
 
 /* 
 *** string version;
 *** can be used to check compatibility or for an outdated version 
 *** Macro added with version 1.1
+*** Is changed on new release
 */
-#define STR_VERSION "1.1" 
+#define STR_VERSION "1.2" 
 
 #ifndef NULL
 	#define NULL 0
@@ -84,8 +137,9 @@ namespace str {
 		typedef const T *const_iterator;				/* const iterator type */
 
 		/*
+		*** string_base<T>()
 		*** standard contructor
-		*** allocates DEF_STRCAP (def: 8) spaces for 
+		*** allocates DEF_STRCAP (def: 32) spaces for 
 		chars and sets the first one to 0x00
 		*** is pretty much the standard allocation state
 		*** use reset() to restore these settings
@@ -94,8 +148,9 @@ namespace str {
 			: len(0), cap(DEF_STRCAP) {
 			raw_data = new T[DEF_STRCAP];
 			raw_data[0] = 0x00;
-		}
+		} 
 		/*
+		*** string_base<T>(unsigned)
 		*** constructor to allocate "capacity" spaces by default
 		*** sets first character to 0x00 (null-terminator)
 		*/
@@ -105,6 +160,7 @@ namespace str {
 			raw_data[0] = 0x00;
 		}
 		/*
+		*** string_base<T>(const T &)
 		*** constructor to allocate DEF_STRCAP places by default
 		*** sets first charater to "ch" (given one)
 		*** sets second char to 0x00
@@ -116,6 +172,7 @@ namespace str {
 			raw_data[1] = 0x00;
 		}
 		/*
+		*** string_base<T>(const T &, unsigned)
 		*** fill constructor
 		*** fill the freshly allocated string 
 		with specified char "ch" ("count" times)
@@ -130,6 +187,7 @@ namespace str {
 			raw_data[len] = 0x00;
 		}
 		/*
+		*** string_base<T>(const T *)
 		*** constructor to assign a C-String
 		*** copies "str" in current string
 		*** automatically inserts null-terminator at the end
@@ -137,54 +195,60 @@ namespace str {
 		string_base<T>(const T *str)
 			: len(strlength<T>(str)), cap(len + 1) {
 			raw_data = new T[cap];
-			for (unsigned i = 0; i < cap; i++)
-				raw_data[i] = str[i];
+			memcpy(raw_data, str, len * sizeof(T));
 			raw_data[len] = 0x00;
 		}
 		/*
+		*** string_base<T>(const string_base<T> &)
 		*** copy constructor
 		*** just copy "obj" in current value
 		*** also copy allocated state (allocate same amount of space as in "str")
 		*** automatically inserts null-terminator at the end
 		*/
 		string_base<T>(const string_base<T> &obj)
-			: len(obj.length()), cap(obj.capacity()) {
+			: len(obj.len), cap(obj.cap) {
 			raw_data = new T[cap];
-			for (unsigned i = 0; i < cap; i++)
-				raw_data[i] = obj.data()[i];
+			memcpy(raw_data, obj.raw_data, len * sizeof(T));
 			raw_data[len] = 0x00;
 		}
 		/*
+		*** string_base<T>(const string_base<T> &, unsigned, unsigned)
 		*** constructor to assign substring of "str" to current value 
 		(starting at position "start2 with a length of "count")
 		*** allocate ("count" + 1) spaces for substring
 		*** automatically inserts null-terminator at the end
-		*** if str.data()[0] == 0x00, it performs a default allocation
+		*** if "start" is greater than str's length, then start = 0
+		*** Version 1.2: Optimizing, using memcpy() now
+		*** Version 1.2: fix crash when "start" is greater than str's length
 		*/
 		explicit string_base<T>(const string_base<T> &str, unsigned start, unsigned count) {
-			unsigned c = count;
-			unsigned l = str.length();
-			if ((start + c) > l) c = (l - start);
-			len = c; cap = len + 1;
+			unsigned l = str.len;
+			if (start > l) start = 0;
+			if ((start + count) > l) 
+				count = (l - start);
+			len = count; cap = len + 1;
 			raw_data = new T[cap];
-			for (unsigned i = 0; i < c; i++)
-				raw_data[i] = str.data()[start + i];
+			memcpy(raw_data, str.raw_data + start, count * sizeof(T));
 			raw_data[len] = 0x00;
 		}
 		/*
+		*** string_base<T>(const T*, unsigned, unsigned)
 		*** constructor to assign substring of a C-String 
 		(starting at position "start2 with a length of "count")
 		*** allocate enough space ("count" + 1)
 		*** automatically inserts null-terminator at the end
+		*** if "start" is greater than str's length, then start = 0
+		*** Version 1.2: Optimizing, using memcpy() now
+		*** Version 1.2: fix crash when "start" is greater than str's length
 		*/
 		explicit string_base<T>(const T *c_str, unsigned start, unsigned count) {
-			unsigned c = count;
 			unsigned l = strlength<T>(c_str);
-			if ((start + c) > l) c = (l - start);
-			len = c; cap = len + 1;
+			if (start > l) start = 0;
+			if ((start + count) > l) 
+				count = (l - start);
+			len = count; cap = len + 1;
 			raw_data = new T[cap];
-			for (unsigned i = 0; i < c; i++)
-				raw_data[i] = c_str[start + i];
+			memcpy(raw_data, c_str + start, count * sizeof(T));
 			raw_data[len] = 0x00;
 		}
 
@@ -197,35 +261,26 @@ namespace str {
 		*** T &at(unsigned) 
 		*** returns reference to a character at position "pos"
 		*** if "pos" is out of range, it returns the last char of string (len - 1)
+		*** Version 1.2: Optimizing, remove "ac_len" variable
 		*/
-		T &at(unsigned pos) {
-			unsigned ac_pos =
-				(pos > (len - 1) ? (len - 1) : pos);
-			return raw_data[ac_pos];
-		}
+		T &at(unsigned pos) { return raw_data[(pos > (len - 1) ? (len - 1) : pos)]; }
 		/*
 		*** const T &at(unsigned) const
 		*** returns reference to a character at position "pos"
 		*** if "pos" is out of range, it returns the last char of string (len - 1)
 		*** if current string value is const-qualified, it returns this function when 
 		"at" is called outside of the class
+		*** Version 1.2: Optimizing, remove "ac_len" variable
 		*/
-		const T &at(unsigned pos) const {
-			unsigned ac_pos =
-				(pos > (len - 1) ? (len - 1) : pos);
-			return raw_data[ac_pos];
-		}
+		const T &at(unsigned pos) const { return raw_data[(pos > (len - 1) ? (len - 1) : pos)]; }
 		/*
 		*** bool at(const T, unsigned)
 		*** checks if given character "ch" is at given position "pos"
 		*** if "pos" is out of range, it compares last char of string (len - 1)
 		*** returns true, if char's value is at position "pos", false if not
+		*** Version 1.2: Optimizing, remove "ac_len" variable
 		*/
-		bool at(const T ch, unsigned pos) {
-			unsigned ac_pos =
-				(pos > (len - 1) ? (len - 1) : pos);
-			return (raw_data[ac_pos] == ch);
-		}
+		bool at(const T ch, unsigned pos) { return (raw_data[(pos > (len - 1) ? (len - 1) : pos)] == ch); }
 		/* 
 		*** T &first()
 		*** returns reference to first char of string 
@@ -272,17 +327,17 @@ namespace str {
 		*** old data is lost once you call this function
 		*** performs a reallocation with adjusted size and capacity 
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimization, using memcpy() now
 		*/
 		string_base<T> &assign(const T *c_str) {
-			if (!*c_str) return *this;
+			if (!*c_str) return (*this);
 			delete[] raw_data;
 			len = strlength<T>(c_str);
 			cap = len + 1;
 			raw_data = new T[cap];
-			for (unsigned i = 0; i < cap; i++)
-				raw_data[i] = c_str[i];
+			memcpy(raw_data, c_str, len * sizeof(T));
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &assign(const T *, unsigned)
@@ -290,18 +345,18 @@ namespace str {
 		*** old data is lost once you call this function
 		*** performs a reallocation with adjusted size and capacity
 		*** returns (modified) *this object
+		*** Version 1.2: Optimization, using memcpy() now
 		*/
 		string_base<T> &assign(const T *c_str, unsigned len) {
-			if (!*c_str || !len) return *this;
+			if (!*c_str || !len) return (*this);
 			unsigned ac_len = MIN(len, strlength<T>(c_str));
 			delete[] raw_data;
 			this->len = ac_len;
 			cap = this->len + 1;
 			raw_data = new T[cap];
-			for (unsigned i = 0; i < cap; i++)
-				raw_data[i] = c_str[i];
+			memcpy(raw_data, c_str, this->len * sizeof(T));
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &assign(const string_base<T> &)
@@ -312,18 +367,17 @@ namespace str {
 			-> you try to assign *this to this string
 			-> str's length is 0
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimization, using memcpy() now
 		*/
 		string_base<T> &assign(const string_base<T> &str) {
-			if (!str.length() || (this == &str))
-				return *this;
+			if (this == &str) return (*this);
 			delete[] raw_data;
-			len = str.length();
+			len = str.len;
 			cap = len + 1;
 			raw_data = new T[cap];
-			for (unsigned i = 0; i < cap; i++)
-				raw_data[i] = str.data()[i];
+			memcpy(raw_data, str.raw_data, len * sizeof(T));
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &assign(const T &, unsigned len)
@@ -340,7 +394,7 @@ namespace str {
 			for (unsigned i = 0; i < cap; i++)
 				raw_data[i] = ch;
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &assign(string_base<T> &, unsigned, unsigned)
@@ -351,23 +405,50 @@ namespace str {
 		*** does nothing if 
 			-> you try to assign *this with same length to this string
 			-> substring's length ("count") == 0
+		*** if "start" is greater than str's length, then start = 0
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimization, using memcpy() now
 		*** based on this article: https://www.includehelp.com/c-programs/substring-implementation.aspx
 		*/
 		string_base<T> &assign(const string_base<T> &str, unsigned start, unsigned count) {
 			if (!count || (this == &str && start == 0 && count == len))
-				return *this;
+				return (*this);
+			unsigned l = str.len;
+			if (start > l) start = 0;
+			if ((start + count) > l) 
+				count = (l - start);
+			len = count; cap = len + 1;
 			delete[] raw_data;
-			unsigned c = count;
-			unsigned l = str.length();
-			if (start > l) return *this;
-			if ((start + c) > l) c = (l - start);
-			len = c; cap = len + 1;
 			raw_data = new T[cap];
-			for (unsigned i = 0; i < c; i++)
-				raw_data[i] = str.data()[start + i];
+			memcpy(raw_data, str.raw_data + start, len * sizeof(T));
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
+		}
+		/*
+		*** string_base<T> &assign(const T *, unsigned, unsigned)
+		*** assigns a substring of "c_str" (starting at "start" with a length
+		of "count") to this string
+		*** old data is lost once you call this function
+		*** performs a reallocation with adjusted size and capacity
+		*** does nothing if
+		-> c_str's value == ""
+		-> substring's length ("count") == 0
+		*** if "start" is greater than c_str's length, then start = 0
+		*** returns (eventually modified) *this object
+		*** Version 1.2: Added this assign overload
+		*/
+		string_base<T> &assign(const T *c_str, unsigned start, unsigned count) {
+			if (!*c_str || !count) return (*this);
+			unsigned l = strlength<T>(c_str);
+			if (start > l) start = 0;
+			if ((start + count) > l)
+				count = (l - start);
+			len = count; cap = len + 1;
+			delete[] raw_data;
+			raw_data = new T[cap];
+			memcpy(raw_data, c_str + start, len * sizeof(T));
+			raw_data[len] = 0x00;
+			return (*this);
 		}
 
 		/*
@@ -377,19 +458,19 @@ namespace str {
 		*** does nothing if
 			-> first character of c_str's value == 0x00
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimization, using memcpy() now
 		*/
 		string_base<T> &append(const T *c_str) {
-			if (!*c_str) return *this;
-			unsigned old = len;
-			if (cap <= (len += strlength<T>(c_str))) {
-				cap += (strlength<T>(c_str) + DEF_ALLOC);
-				raw_data = (T *)realloc(raw_data, (cap * sizeof(T)));
+			if (!*c_str) return (*this);
+			unsigned old = len, l = strlength<T>(c_str);
+			if (cap <= (len += l)) {
+				cap += (l + DEF_ALLOC);
+				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return *this;
-			for (unsigned i = old; i < len; i++)
-				raw_data[i] = c_str[i - old];
+			if (raw_data == NULL) return (*this);
+			memcpy(raw_data + old, c_str, (len - old) * sizeof(T));
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &append(const T &)
@@ -400,12 +481,12 @@ namespace str {
 		string_base<T> &append(const T &ch) {
 			if (cap <= (len += 1)) {
 				cap += (1 + DEF_ALLOC);
-				raw_data = (T *)realloc(raw_data, (cap * sizeof(T)));
+				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return *this;
+			if (raw_data == NULL) return (*this);
 			raw_data[len - 1] = ch;
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &append(const T &, unsigned)
@@ -416,17 +497,17 @@ namespace str {
 		*** returns (eventually modified) *this object
 		*/
 		string_base<T> &append(const T &ch, unsigned count) {
-			if (!count) return *this;
+			if (!count) return (*this);
 			unsigned o = len;
 			if (cap <= (len += count)) {
 				cap += (count + DEF_ALLOC);
-				raw_data = (T *)realloc(raw_data, (cap * sizeof(T)));
+				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return *this;
+			if (raw_data == NULL) return (*this);
 			for (unsigned i = o; i < (o + count); i++)
 				raw_data[i] = ch;
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &append(const string_base<T> &)
@@ -435,23 +516,23 @@ namespace str {
 		*** does nothing if 
 			-> str's length == 0
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimization, using memcpy() now
 		*/
 		string_base<T> &append(const string_base<T> &str) {
-			if (!str.length()) return *this;
+			if (!str.len) return (*this);
 			if (this == &str) {
 				append(string_base<T>(str));
-				return *this;
+				return (*this);
 			}
-			unsigned o = len;
-			if (cap <= (len += strlength<T>(str.c_str()))) {
-				cap += (strlength<T>(str.c_str()) + DEF_ALLOC);
-				raw_data = (T *)realloc(raw_data, (cap * sizeof(T)));
+			unsigned o = len, l = str.len;
+			if (cap <= (len += l)) {
+				cap += (l + DEF_ALLOC);
+				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return *this;
-			for (unsigned i = o; i < len; i++)
-				raw_data[i] = str.data()[i - o];
+			if (raw_data == NULL) return (*this);
+			memcpy(raw_data + o, str.raw_data, (len - o) * sizeof(T));
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &append(const T *, unsigned)
@@ -461,20 +542,20 @@ namespace str {
 			-> first character of "c_str" == 0x00
 			-> count == 0
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimization, using memcpy() now
 		*/
 		string_base<T> &append(const T *c_str, unsigned count) {
-			if (!*c_str || !count) return *this;
+			if (!*c_str || !count) return (*this);
 			unsigned ac_len = MIN(count, strlength<T>(c_str));
 			unsigned o = len;
 			if (cap <= (len += ac_len)) {
 				cap += (ac_len + DEF_ALLOC);
-				raw_data = (T *)realloc(raw_data, (cap * sizeof(T)));
+				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return *this;
-			for (unsigned i = o; i < (o + ac_len); i++)
-				raw_data[i] = c_str[i - o];
+			if (raw_data == NULL) return (*this);
+			memcpy(raw_data + o, c_str, ac_len * sizeof(T));
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &append(const T *, unsigned, unsigned)
@@ -484,23 +565,25 @@ namespace str {
 		*** does nothing if
 			-> substring's length ("count") == 0
 			-> first character of c_str's value == 0x00
+		*** if "start" is greater than c_str's length, then start = 0
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimization, using memcpy() now
 		*/
 		string_base<T> &append(const T *c_str, unsigned start, unsigned count) {
-			if (!count || !*c_str) return *this;
-			unsigned o = len, c = count;
+			if (!count || !*c_str) return (*this);
+			unsigned o = len;
 			unsigned l = strlength<T>(c_str);
-			if (start > l) return *this;
-			if ((start + c) > l) c = (l - start);
-			if (cap <= (len += c)) {
-				cap += (c + DEF_ALLOC);
-				raw_data = (T *)realloc(raw_data, (cap * sizeof(T)));
+			if (start > l) start = 0;
+			if ((start + count) > l) 
+				count = (l - start);
+			if (cap <= (len += count)) {
+				cap += (count + DEF_ALLOC);
+				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return *this;
-			for (unsigned i = 0, j = o; i < c; i++, j++)
-				raw_data[j] = c_str[start + i];
+			if (raw_data == NULL) return (*this);
+			memcpy(raw_data, c_str + start, count * sizeof(T));
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &append(const string_base<T> &, unsigned, unsigned)
@@ -510,27 +593,29 @@ namespace str {
 		*** does nothing if
 			-> substring's length ("count") == 0
 			-> str's length == 0
+		*** if "start" is greater than str's length, then start = 0
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimization, using memcpy() now
 		*/
 		string_base<T> &append(const string_base<T> &str, unsigned start, unsigned count) {
-			if (!count || !str.length()) return *this;
+			if (!count || !str.len) return (*this);
 			if (this == &str) {
 				append(string_base<T>(str), start, count);
-				return *this;
+				return (*this);
 			}
-			unsigned o = len, c = count;
-			unsigned l = str.length();
-			if (start > l) return *this;
-			if ((start + c) > l) c = (l - start);
-			if (cap <= (len += c)) {
-				cap += (c + DEF_ALLOC);
-				raw_data = (T *)realloc(raw_data, (cap * sizeof(T)));
+			unsigned o = len;
+			unsigned l = str.len;
+			if (start > l) start = 0;
+			if ((start + count) > l) 
+				count = (l - start);
+			if (cap <= (len += count)) {
+				cap += (count + DEF_ALLOC);
+				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return *this;
-			for (unsigned i = 0, j = o; i < c; i++, j++)
-				raw_data[j] = str.data()[start + i];
+			if (raw_data == NULL) return (*this);
+			memcpy(raw_data, str.raw_data + start, count * sizeof(T));
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 
 		/*
@@ -540,32 +625,24 @@ namespace str {
 		*** does nothing if
 			-> Given "pos" is greater than current value's length (this->length())
 			-> str's length == 0
-		*** returns *this object
+		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimizing, using memmove() and memcpy() now
 		*/
 		string_base<T> &insert(const string_base<T> &str, unsigned pos) {
-			if (pos > len || !str.length()) return *this;
+			if (pos > len || !str.len) return (*this);
 			if (this == &str) {
 				insert(string_base<T>(str), pos);
-				return *this;
+				return (*this);
 			}
-			unsigned o = len;
-			if (cap <= (len += str.length())) {
-				cap += (str.length() + DEF_ALLOC);
-				raw_data = (T *)realloc(raw_data, (cap * sizeof(T)));
+			if (cap <= (len += str.len)) {
+				cap += (str.len + DEF_ALLOC);
+				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return *this;
-			if (pos) {
-				for (unsigned i = o; i >= pos; i--)
-					raw_data[i + str.length()] = raw_data[i];
-			} else {
-				for (unsigned i = o; i > 0; i--)
-					raw_data[i + str.length()] = raw_data[i];
-				raw_data[str.length()] = raw_data[0];
-			}
-			for (unsigned i = pos; i < (pos + str.length()); i++)
-				raw_data[i] = str.data()[i - pos];
+			if (raw_data == NULL) return (*this);
+			memmove(raw_data + (pos + str.len), raw_data + pos, (len - str.len - pos) * sizeof(T));
+			memcpy(raw_data + pos, str.raw_data, str.len * sizeof(T));
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &insert(const string_base<T> &, unsigned, unsigned, unsigned)
@@ -575,35 +652,29 @@ namespace str {
 		*** does nothing if
 			-> Given "pos" is greater than current value's length (this->length())
 			-> substring's length ("count") == 0
+		*** if "start" is greater than str's length, then start = 0
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimizing, using memmove() and memcpy() now
 		*/
 		string_base<T> &insert(const string_base<T> &str, unsigned pos, unsigned start, unsigned count) {
-			if (pos > len || !count) return *this;
+			if (pos > len || !count) return (*this);
 			if (this == &str) {
 				insert(string_base<T>(str), pos, start, count);
-				return *this;
+				return (*this);
 			}
-			unsigned o = len, c = count;
-			unsigned l = str.length();
-			if (start > l) return *this;
-			if ((start + c) > l) c = (l - start);
-			if (cap <= (len += c)) {
-				cap += (c + DEF_ALLOC);
-				raw_data = (T *)realloc(raw_data, (cap * sizeof(T)));
+			unsigned l = str.len;
+			if (start > l) start = 0;
+			if ((start + count) > l) 
+				count = (l - start);
+			if (cap <= (len += count)) {
+				cap += (count + DEF_ALLOC);
+				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return *this;
-			if (pos) {
-				for (unsigned i = o; i >= pos; i--)
-					raw_data[i + c] = raw_data[i];
-			} else {
-				for (unsigned i = o; i > 0; i--)
-					raw_data[i + c] = raw_data[i];
-				raw_data[c] = raw_data[0];
-			}
-			for (unsigned i = pos, j = start; i < (pos + c); i++, j++)
-				raw_data[i] = str.data()[j];
+			if (raw_data == NULL) return (*this);
+			memmove(raw_data + (pos + count), raw_data + pos, (len - count - pos) * sizeof(T));
+			memcpy(raw_data + pos, str.raw_data + start, count * sizeof(T));
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &insert(const string_base<T> &, unsigned, unsigned)
@@ -613,34 +684,26 @@ namespace str {
 			-> Given "pos" is greater than current value's length (this->length())
 			-> str's length == 0
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimizing, using memmove() and memcpy() now
 		*/
 		string_base<T> &insert(const string_base<T> &str, unsigned pos, unsigned count) {
-			if (pos > len || !str.length())
-				return *this;
+			if (pos > len || !str.len)
+				return (*this);
 			if (this == &str) {
 				insert(string_base<T>(str), pos, count);
-				return *this;
+				return (*this);
 			}
-			unsigned o = len, l = count;
-			if (l > str.length())
-				l -= (count - str.length());
-			if (cap <= (len += l)) {
-				cap += (l + DEF_ALLOC);
-				raw_data = (T *)realloc(raw_data, (cap * sizeof(T)));
+			if (count > str.len)
+				count -= (count - str.len);
+			if (cap <= (len += count)) {
+				cap += (count + DEF_ALLOC);
+				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return *this;
-			if (pos) {
-				for (unsigned i = o; i >= pos; i--)
-					raw_data[i + l] = raw_data[i];
-			} else {
-				for (unsigned i = o; i > 0; i--)
-					raw_data[i + l] = raw_data[i];
-				raw_data[l] = raw_data[0];
-			}
-			for (unsigned i = pos; i < (pos + l); i++)
-				raw_data[i] = str.data()[i - pos];
+			if (raw_data == NULL) return (*this);
+			memmove(raw_data + (pos + count), raw_data + pos, (len - count - pos) * sizeof(T));
+			memcpy(raw_data + pos, str.raw_data, count * sizeof(T));
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &insert(const T *, unsigned)
@@ -650,27 +713,20 @@ namespace str {
 			-> Given "pos" is greater than current value's length (this->length())
 			-> first character of c_str's value == 0x00
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimizing, using memmove() and memcpy() now
 		*/
 		string_base<T> &insert(const T *c_str, unsigned pos) {
-			if (pos > len || !*c_str) return *this;
-			unsigned o = len, l = strlength<T>(c_str);
+			if (pos > len || !*c_str) return (*this);
+			unsigned l = strlength<T>(c_str);
 			if (cap <= (len += l)) {
 				cap += (l + DEF_ALLOC);
-				raw_data = (T *)realloc(raw_data, (cap * sizeof(T)));
+				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return *this;
-			if (pos) {
-				for (unsigned i = o; i >= pos; i--)
-					raw_data[i + l] = raw_data[i];
-			} else {
-				for (unsigned i = o; i > 0; i--)
-					raw_data[i + l] = raw_data[i];
-				raw_data[l] = raw_data[0];
-			}
-			for (unsigned i = pos; i < (pos + l); i++)
-				raw_data[i] = c_str[i - pos];
+			if (raw_data == NULL) return (*this);
+			memmove(raw_data + (pos + l), raw_data + pos, (len - l - pos) * sizeof(T));
+			memcpy(raw_data + pos, c_str, l * sizeof(T));
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &insert(const T *, unsigned, unsigned, unsigned)
@@ -681,31 +737,26 @@ namespace str {
 			-> Given "pos" is greater than current value's length (this->length())
 			-> substring's length ("count") == 0
 			-> first character of c_str's value == 0x00
+		*** if "start" is greater than str's length, then start = 0
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimizing, using memmove() and memcpy() now
 		*/
 		string_base<T> &insert(const T *c_str, unsigned pos, unsigned start, unsigned count) {
-			if (pos > len || !count || !*c_str) return *this;
-			unsigned o = len, c = count;
+			if (pos > len || !count || !*c_str) return (*this);
+			unsigned o = len;
 			unsigned l = strlength<T>(c_str);
-			if (start > l) return *this;
-			if ((start + c) > l) c = (l - start);
-			if (cap <= (len += c)) {
-				cap += (c + DEF_ALLOC);
-				raw_data = (T *)realloc(raw_data, (cap * sizeof(T)));
+			if (start > count) start = 0;
+			if ((start + count) > l) 
+				count = (l - start);
+			if (cap <= (len += count)) {
+				cap += (count + DEF_ALLOC);
+				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return *this;
-			if (pos) {
-				for (unsigned i = o; i >= pos; i--)
-					raw_data[i + c] = raw_data[i];
-			} else {
-				for (unsigned i = o; i > 0; i--)
-					raw_data[i + c] = raw_data[i];
-				raw_data[c] = raw_data[0];
-			}
-			for (unsigned i = pos, j = start; i < (pos + c); i++, j++)
-				raw_data[i] = c_str[j];
+			if (raw_data == NULL) return (*this);
+			memmove(raw_data + (pos + count), raw_data + pos, (len - count - pos) * sizeof(T));
+			memcpy(raw_data + pos, c_str + start, count * sizeof(T));
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &insert(const T *, unsigned, unsigned)
@@ -716,30 +767,22 @@ namespace str {
 			-> substring's length ("count") == 0
 			-> first character of c_str's value == 0x00
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimizing, using memmove() and memcpy() now
 		*/
 		string_base<T> &insert(const T *c_str, unsigned pos, unsigned count) {
 			if (pos > len || !count || !*c_str)
-				return *this;
-			unsigned o = len, c = count;
-			if (c > strlength<T>(c_str))
-				c -= (count - strlength<T>(c_str));
-			if (cap <= (len += c)) {
-				cap += (c + DEF_ALLOC);
-				raw_data = (T *)realloc(raw_data, (cap * sizeof(T)));
+				return (*this);
+			unsigned l = strlength<T>(c_str);
+			if (count > l) count -= (count - l);
+			if (cap <= (len += count)) {
+				cap += (count + DEF_ALLOC);
+				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return *this;
-			if (pos) {
-				for (unsigned i = o; i >= pos; i--)
-					raw_data[i + c] = raw_data[i];
-			} else {
-				for (unsigned i = o; i > 0; i--)
-					raw_data[i + c] = raw_data[i];
-				raw_data[c] = raw_data[0];
-			}
-			for (unsigned i = pos, j = 0; i < (pos + c); i++, j++)
-				raw_data[i] = c_str[j];
+			if (raw_data == NULL) return (*this);
+			memmove(raw_data + (pos + count), raw_data + pos, (len - count - pos) * sizeof(T));
+			memcpy(raw_data + pos, c_str, count * sizeof(T));
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &insert(const T &, unsigned, count)
@@ -749,28 +792,21 @@ namespace str {
 			-> Given "pos" is greater than current value's length (this->length())
 			-> count == 0
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimizing, using memmove() now
 		*/
 		string_base<T> &insert(const T &ch, unsigned pos, unsigned count) {
 			if (pos > len || !count)
-				return *this;
-			unsigned o = len, c = count;
-			if (cap <= (len += c)) {
-				cap += (c + DEF_ALLOC);
-				raw_data = (T *)realloc(raw_data, (cap * sizeof(T)));
+				return (*this);
+			if (cap <= (len += count)) {
+				cap += (count + DEF_ALLOC);
+				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return *this;
-			if (pos) {
-				for (unsigned i = o; i >= pos; i--)
-					raw_data[i + c] = raw_data[i];
-			} else {
-				for (unsigned i = o; i > 0; i--)
-					raw_data[i + c] = raw_data[i];
-				raw_data[c] = raw_data[0];
-			}
-			for (unsigned i = pos; i < (pos + c); i++)
+			if (raw_data == NULL) return (*this);
+			memmove(raw_data + (pos + count), raw_data + pos, (len - count - pos) * sizeof(T));
+			for (unsigned i = pos; i < (pos + count); i++)
 				raw_data[i] = ch;
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &insert(const T &, unsigned)
@@ -779,26 +815,19 @@ namespace str {
 		*** does nothing if
 			-> Given "pos" is greater than current value's length (this->length())
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimization, using memmove() now
 		*/
 		string_base<T> &insert(const T &ch, unsigned pos) {
-			if (pos > len) return *this;
-			unsigned o = len, c = 1;
-			if (cap <= (len += c)) {
-				cap += (c + DEF_ALLOC);
+			if (pos > len) return (*this);
+			if (cap <= (len += 1)) {
+				cap += (1 + DEF_ALLOC);
 				raw_data = (T *)realloc(raw_data, (cap * sizeof(T)));
 			}
-			if (raw_data == NULL) return *this;
-			if (pos) {
-				for (unsigned i = o; i >= pos; i--)
-					raw_data[i + c] = raw_data[i];
-			} else {
-				for (unsigned i = o; i > 0; i--)
-					raw_data[i + c] = raw_data[i];
-				raw_data[c] = raw_data[0];
-			}
+			if (raw_data == NULL) return (*this);
+			memmove(raw_data + (pos + 1), raw_data + pos, (len - 1 - pos) * sizeof(T));
 			raw_data[pos] = ch;
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 
 		/*
@@ -808,14 +837,14 @@ namespace str {
 		*** does nothing if
 			-> Given "pos" is greater than highest index of current string value 
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimizing, using memmove() now
 		*/
 		string_base<T> &erase(unsigned pos) {
-			if (pos > (len - 1)) return *this;
-			for (unsigned i = (pos + 1); i <= len; i++)
-				raw_data[i - 1] = raw_data[i];
-			this->len -= 1;
+			if (pos > (len - 1)) return (*this);
+			memmove(raw_data + pos, raw_data + pos + 1, (len - pos) * sizeof(T));
+			--this->len;
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &erase(unsigned, unsigned)
@@ -824,16 +853,15 @@ namespace str {
 		*** does nothing if 
 			-> Given "pos" is greater than highest index of current string value
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimizing, using memmove() now
 		*/
 		string_base<T> &erase(unsigned pos, unsigned count) {
-			if (pos > (len - 1)) return *this;
-			unsigned c = count;
-			if ((pos + c) > len) c = (len - pos);
-			for (unsigned i = (pos + c); i <= len; i++)
-				raw_data[i - c] = raw_data[i];
-			this->len -= c;
+			if (pos > (len - 1)) return (*this);
+			if ((pos + count) > len) count = (len - pos);
+			memmove(raw_data + pos, raw_data + pos + count, (len - count - pos) * sizeof(T));
+			this->len -= count;
 			raw_data[len] = 0x00;
-			return *this;
+			return (*this);
 		}
 
 		/*
@@ -843,21 +871,21 @@ namespace str {
 		*** does nothing if
 			-> Given "pos" is greater than highest index of current string value
 			-> substring's length ("count") == 0
+		*** if "start" is greater than str's length, then start = 0
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimizing, using memcpy() now
 		*/
 		string_base<T> &substr(unsigned start, unsigned count) {
-			if (start > (len - 1) || !count) return *this;
-			unsigned o = len, c = count;
-			if ((start + c) > len)
-				c = (len - start);
+			if (start > (len - 1) || !count) return (*this);
+			if ((start + count) > len)
+				count = (len - start);
 			T *new_data = new T[cap];
-			for (unsigned i = start; i < (start + c); i++)
-				new_data[i - start] = raw_data[i];
-			this->len = c;
+			memcpy(new_data, raw_data + start, count * sizeof(T));
+			this->len = count;
 			new_data[len] = 0x00;
 			delete[] raw_data;
 			raw_data = new_data;
-			return *this;
+			return (*this);
 		}
 
 		/*
@@ -868,22 +896,9 @@ namespace str {
 			-> current string's length == 0
 			-> ch's value == 0x00 (null-terminator)
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimizing, using another remove() overload now
 		*/
-		string_base<T> &remove(const T &ch) {
-			if (!len || !ch) return *this;
-			unsigned rem_c = 0;
-			T *new_data = new T[cap];
-			for (unsigned i = 0, j = 0; i < len; i++) {
-				if (raw_data[i] != ch)
-					new_data[j++] = raw_data[i];
-				else ++rem_c;
-			}
-			len -= rem_c;
-			new_data[len] = 0x00;
-			delete[] raw_data;
-			raw_data = new_data;
-			return *this;
-		}
+		string_base<T> &remove(const T &ch) { remove((T)ch, 0, len); return (*this); }
 		/*
 		*** string_base<T> &remove(const T &, unsigned, unsigned)
 		*** removes a specified character represented by ch's value 
@@ -896,25 +911,22 @@ namespace str {
 			-> ch's value == 0x00 (null-terminator)
 			-> Given "pos" is greater than highest index of current string value
 		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimizing, using memmove() now
 		*/
 		string_base<T> &remove(const T &ch, unsigned start, unsigned count) {
-			if (!len || !count || !ch || start > (len - 1)) return *this;
-			unsigned rem_c = 0, c = count;
-			if ((start + c) > len)
-				c = (len - start);
-			T *new_data = new T[cap];
-			for (unsigned i = start, j = 0; i < len; i++) {
-				if (i < (start + c))
-					if (raw_data[i] != ch)
-						new_data[j++] = raw_data[i - start];
-					else ++rem_c;
-				else new_data[j++] = raw_data[i - start];
-			}
-			len -= rem_c;
-			new_data[len] = 0x00;
-			delete[] raw_data;
-			raw_data = new_data;
-			return *this;
+			if (!len || !count || !ch || start > (len - 1))
+				return (*this);
+			unsigned rem_c = 0;
+			if ((start + count) > len)
+				count = (len - start);
+			for (unsigned i = start; i < (start + count); i++)
+				if (raw_data[i] == ch) {
+					memmove(raw_data + i, raw_data + i + 1, (len - i) * sizeof(T));
+					++rem_c;
+				}
+			this->len -= rem_c;
+			raw_data[len] = 0x00;
+			return (*this);
 		}
 
 		/*
@@ -950,8 +962,8 @@ namespace str {
 		int compare(const string_base<T> &str) const {
 			if (this == &str) return 0;
 			unsigned i = 0;
-			while (raw_data[i] && raw_data[i] == str.data()[i]) ++i;
-			return raw_data[i] - str.data()[i];
+			while (raw_data[i] && raw_data[i] == str.raw_data[i]) ++i;
+			return raw_data[i] - str.raw_data[i];
 		}
 		/*
 		*** int compare(const string_base<T> &, unsigned, unsigned) const
@@ -961,11 +973,11 @@ namespace str {
 		*/
 		int compare(const string_base<T> &str, unsigned start, unsigned count) const {
 			if (this == &str && !start &&
-				count == str.length()) return 0;
+				count == str.len) return 0;
 			unsigned i = 0;
-			while (raw_data[i] && raw_data[i] == str.data()[start + i] && count)
+			while (raw_data[i] && raw_data[i] == str.raw_data[start + i] && count)
 				--count, ++i;
-			return raw_data[i] - str.data()[start + i];
+			return raw_data[i] - str.raw_data[start + i];
 		}
 		/*
 		*** int compare(const string_base<T> &, unsigned, unsigned, unsigned, unsigned) const
@@ -980,12 +992,12 @@ namespace str {
 		*/
 		int compare(const string_base<T> &str, unsigned s1pos, unsigned s1count, unsigned s2pos, unsigned s2count) const {
 			if (this == &str && !s1pos && !s2pos &&
-				s1count == len && s2count == str.length())
+				s1count == len && s2count == str.len)
 				return 0;
 			unsigned i = 0;
-			while (raw_data[s1pos + i] && raw_data[s1pos + i] == str.data()[s2pos + i] && s1count && s2count)
+			while (raw_data[s1pos + i] && raw_data[s1pos + i] == str.raw_data[s2pos + i] && s1count && s2count)
 				++i, --s1count, --s2count;
-			return raw_data[s1pos + i] - str.data()[s2pos + i];
+			return raw_data[s1pos + i] - str.raw_data[s2pos + i];
 		}
 		/*
 		*** int compare(const T *) const 
@@ -1051,13 +1063,13 @@ namespace str {
 		*** implementation is based on this article: https://stackoverflow.com/questions/12784766/check-substring-exists-in-a-string-in-c
 		*/
 		unsigned find(const string_base<T> &needle, unsigned pos = 0U) {
-			unsigned counter = 0, ctr = pos, l = needle.length();
+			unsigned counter = 0, ctr = pos, l = needle.len;
 			if (len < 1 || len < l || l < 1) return len;
 			while (ctr <= (len - l) && l > 0) {
-				if ((raw_data[ctr]) == needle.data()[0]) {
+				if ((raw_data[ctr]) == needle.raw_data[0]) {
 					counter = 0;
 					for (unsigned count = ctr; count < (ctr + l); count++) {
-						if (raw_data[count] == needle.data()[counter])
+						if (raw_data[count] == needle.raw_data[counter])
 							++counter;
 						else { counter = 0; break; }
 					}
@@ -1130,11 +1142,10 @@ namespace str {
 		*** returns position of first occurrence, or string's length if it has not been found
 		*/
 		unsigned find(const T &needle, unsigned pos = 0U) {
-			unsigned res = len;
 			for (unsigned i = pos; i < len; i++)
 				if (raw_data[i] == needle)
-					res = i;
-			return res;
+					return i;
+			return len;
 		}
 		/*
 		*** unsigned find(const T &, unsigned, unsigned)
@@ -1148,11 +1159,10 @@ namespace str {
 		*/
 		unsigned find(const T &needle, unsigned pos, unsigned count) {
 			if (len < (pos + count)) return len;
-			unsigned res = len;
 			for (unsigned i = pos; i < (pos + count); i++)
 				if (raw_data[i] == needle)
-					res = i;
-			return res;
+					return i;
+			return len;
 		}
 
 		/*
@@ -1163,7 +1173,7 @@ namespace str {
 		*** returns (eventually modified) *this object
 		*/
 		string_base<T> &replace(unsigned pos, const T &replace) {
-			if (pos > (len - 1)) return *this;
+			if (pos > (len - 1)) return (*this);
 			raw_data[pos] = replace;
 			return *this;
 		}
@@ -1176,12 +1186,12 @@ namespace str {
 		string_base<T> &replace(const string_base<T> &replace, unsigned start, unsigned count) {
 			if (this == &replace) {
 				this->replace(string_base<T>(replace), start, count);
-				return *this;
+				return (*this);
 			}
-			if (start >= len || len < (start + count)) return *this;
+			if (start >= len || len < (start + count)) return (*this);
 			erase(start, count);
 			insert(replace, start);
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &replace(const T *, unsigned, unsigned)
@@ -1193,10 +1203,10 @@ namespace str {
 		*** return (eventually modified) *this object
 		*/
 		string_base<T> &replace(const T *replace, unsigned start, unsigned count) {
-			if (start >= len || len < (start + count)) return *this;
+			if (start >= len || len < (start + count)) return (*this);
 			erase(start, count);
 			insert(replace, start);
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &replace(const string_base<T> &, const string_base<T> &)
@@ -1207,16 +1217,16 @@ namespace str {
 		*** returns (eventually modified) *this object
 		*/
 		string_base<T> &replace(const string_base<T> &element, const string_base<T> &replace) {
-			if (this == &replace) return *this;
+			if (this == &replace) return (*this);
 			if (this == &element) {
 				this->replace(string_base<T>(element), replace);
-				return *this;
+				return (*this);
 			}
 			unsigned pos = find(element, 0);
-			if (pos == len) return *this;
-			erase(pos, element.length());
+			if (pos == len) return (*this);
+			erase(pos, element.len);
 			insert(replace, pos);
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &replace(const T *, const T *)
@@ -1227,10 +1237,10 @@ namespace str {
 		*/
 		string_base<T> &replace(const T *element, const T *replace) {
 			unsigned pos = find(string_base<T>(element), 0);
-			if (pos == len) return *this;
+			if (pos == len) return (*this);
 			erase(pos, strlength<T>(element));
 			insert(replace, pos);
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &replace(const T &, const T &, unsigned)
@@ -1240,11 +1250,11 @@ namespace str {
 		*** returns (eventually modified) *this object
 		*/
 		string_base<T> &replace(const T &element, const T &replace, unsigned pos) {
-			if (pos >= len) return *this;
+			if (pos >= len) return (*this);
 			for (unsigned i = pos; i < len; i++)
 				if (raw_data[i] == element)
 					raw_data[i] = replace;
-			return *this;
+			return (*this);
 		}
 		/*
 		*** string_base<T> &replace(const T &, const T &, unsigned, unsigned)
@@ -1256,11 +1266,11 @@ namespace str {
 		*** returns (eventually modified) *this object
 		*/
 		string_base<T> &replace(const T &element, const T &replace, unsigned pos, unsigned count) {
-			if (pos >= len || len < (pos + count)) return *this;
+			if (pos >= len || len < (pos + count)) return (*this);
 			for (unsigned i = pos; i < (pos + count); i++)
 				if (raw_data[i] == element)
 					raw_data[i] = replace;
-			return *this;
+			return (*this);
 		}
 
 		void push_back(const T &ch) { append(ch); }									/* append ch's value to current value */
@@ -1275,11 +1285,14 @@ namespace str {
 		*** void reserve(unsigned)
 		*** reallocate string with new size of (cap += count)
 		*** doesn't touch data at all
+		*** Version 1.2: Add null-terminator at the end of array
 		*/
 		void reserve(unsigned count = 1) {										
 			if (!count) return;
 			cap += count;
 			raw_data = (T *)realloc(raw_data, cap * sizeof(T));
+			if (raw_data == NULL) return;
+			raw_data[cap] = 0x00;
 		}
 		/* resize string to "count", fill possible new spaces with '\0' */
 		void resize(unsigned count) { resize(count, (T)'\0'); }
@@ -1294,13 +1307,13 @@ namespace str {
 			if (count < len) {
 				len = count; cap = len + 1;
 				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
-				if (raw_data == NULL) return *this;
+				if (raw_data == NULL) return;
 				raw_data[len] = 0x00;
 			}
 			else if (count > len) {
 				unsigned o = len; len = count; cap = len + 1;
 				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
-				if (raw_data == NULL) return *this;
+				if (raw_data == NULL) return;
 				for (unsigned i = o; i < count; i++)
 					raw_data[i] = ch;
 				raw_data[len] = 0x00;
@@ -1314,14 +1327,15 @@ namespace str {
 			a.swap(b); 
 			// a is now "Apple" and b is now "Pear"
 		*** performs an assign operation internally
-		*** Version 1.1: change function to use memcpy()
+		*** Version 1.2: fix function
 		*/
 		void swap(string_base<T> &value) {
 			if (this == &value) return;
-			string_base<T> tmp;
-			memcpy(&tmp, &value, sizeof(string_base<T>));
-			memcpy(&value, this, sizeof(string_base<T>));
-			memcpy(this, &tmp, sizeof(string_base<T>));
+			string_base<T> *tmp =
+				new string_base<T>(value);
+			value.assign(*this);
+			assign(*tmp);
+			tmp->cleanup();
 		}
 		/* 
 		*** void reverse()
@@ -1331,7 +1345,7 @@ namespace str {
 		void reverse() { reverse(0, len - 1); }			
 		/*
 		*** void reverse(unsigned, unsigned)
-		*** reverses string's data 
+		*** reverses string's data from "start" to "end"
 		*** Example:
 			string a = "Hello world!";
 			a.reverse(0, a.length() - 1);
@@ -1358,12 +1372,9 @@ namespace str {
 		void shrink() {
 			if (cap == (len + 1)) return;
 			cap = len + 1;
-			T *new_data = new T[cap];
-			for (unsigned i = 0; i < len; i++)
-				new_data[i] = raw_data[i];
-			new_data[len] = 0x00;
-			delete[] raw_data;
-			raw_data = new_data;
+			raw_data = (T *)realloc(raw_data, cap * sizeof(T));
+			if (raw_data == NULL) return;
+			raw_data[len] = 0x00;
 		}
 		/*
 		*** void clear()
@@ -1392,10 +1403,11 @@ namespace str {
 
 		/*
 		*** void cleanup()
-		*** Version 1.1: add this function and delete default destructor 
 		*** custom destructor you can call if you 
 		want to deallocate the memory used by this string object
+		*** this object and all of its members will be invalided after calling this function
 		*** All data is lost when calling this 
+		*** Version 1.1: add this function and remove default destructor
 		*/
 		void cleanup() {
 			delete[] raw_data;
@@ -1420,11 +1432,7 @@ namespace str {
 		***		a[0] = 'Y';						-> change first char of "a" to 'Y'
 		*** can be used to output the character at position "pos" as well
  		*/	
-		T &operator [](unsigned pos) {
-			unsigned ac_pos = 
-				(pos > (len - 1) ? (len - 1) : pos);
-			return raw_data[ac_pos];
-		}
+		T &operator [](unsigned pos) { return raw_data[(pos > (len - 1) ? (len - 1) : pos)]; }
 		/*
 		*** const T &operator [](unsigned) const
 		*** return a reference to the char which is at position "pos"
@@ -1432,11 +1440,7 @@ namespace str {
 		*** if current string value is const-qualified, it returns this function when
 		"operator[]" is called outside of the class
 		*/
-		const T &operator [](unsigned pos) const {
-			unsigned ac_pos =
-				(pos > (len - 1) ? (len - 1) : pos);
-			return raw_data[ac_pos];
-		}
+		const T &operator [](unsigned pos) const { return raw_data[(pos > (len - 1) ? (len - 1) : pos)]; }
 
 		string_base<T> &operator =(const T &ch) { return assign(ch, 1); }					/* assign ch's value to current string value */
 		string_base<T> &operator =(const T *c_str) { return assign(c_str); }				/* assign c_str's value to current string value */
@@ -1500,11 +1504,11 @@ namespace str {
 		*** only used within the class, not outside (and also not reachable from outside the class)
 		*/
 		template <typename T_>
-		static unsigned strlength(const T_ *str) {
+		static unsigned strlength(const T_ *c_str) {
 			/* return 0 if first char is null-terminator */
-			if (!*str) return 0;
+			if (!*c_str) return 0;
 			unsigned res = 0;
-			for (; str[res] != 0x00; res++);
+			for (; c_str[res] != 0x00; res++);
 			return res;
 		}
 
