@@ -8,6 +8,8 @@
 *** ----> I'm generally open for any kinds of criticism, as long as it's contructive and not offensive in any way.
 *** ----> Almost all implementations in this class are personally written by me, if not, I pasted an URL to the source above the function.
 ***
+***
+*** L I C E N S E   T E X T
 *** This software is provided 'as-is', without any express or implied warranty!!!
 *** In no event will me be held liable for any damages arising from the use of this software.
 *** 
@@ -16,7 +18,10 @@
 ***				you must not claim that you wrote the original software.
 ***				If you use this software in a product, an acknowledgment
 ***				in the product documentation is required.
-***			2. This notice may not be removed or altered from any source distribution.
+***			2. Altered source versions must be marked as such, and must not be misrepresented 
+				as being the original software. 
+***			3. This notice may not be removed or altered from any source distribution.
+***
 ***
 *** NOTE: 
 ***			This software is not supposed to replace the std::basic_string library, 
@@ -65,12 +70,18 @@
 	Removed conflicting char contructor
 	Added some typedefs for large type names
 	Added functions to convert string to arithmetic types (using stol, stof, ...)
+*** 1.3.5: 
+	Added contructor to copy chars from a C-String buffer
+	Fixed some mistakes when inserting null-terminator
 */
 
 /*
 ==============================================
 === TODO								   ===
 ==============================================
+...
+...
+...
 */
 
 
@@ -119,8 +130,9 @@ capacity allocation for large or for smaller strings
 *** Macro added with version 1.1
 *** Is changed on new release
 */
-#define STR_VERSION "1.3" 
+#define STR_VERSION "1.3.5" 
 
+/* define NULL macro if it's not defined by default */
 #ifndef NULL
 	#define NULL 0
 #endif
@@ -189,11 +201,24 @@ namespace str {
 		*** copies "str" in current string
 		*** automatically inserts null-terminator at the end
 		*/
-		string_base<T>(const T *str)
-			: len(strlength<T>(str)), cap(len + 1) {
+		string_base<T>(const T *c_str)
+			: len(strlength<T>(c_str)), cap(len + 1) {
 			raw_data = new T[cap];
-			memcpy(raw_data, str, len * sizeof(T));
+			memcpy(raw_data, c_str, len * sizeof(T));
 			raw_data[len] = 0x00;
+		}
+		/*
+		*** string_base<T>(const T *, unsigned)
+		*** constructor to copy first "len" chars of c_str's value in current string
+		*** automatically inserts null-terminator at the end 
+		*** Version: 1.3.5: Added this contructor
+		*/
+		string_base<T>(const T *c_str, unsigned len) {
+			this->len = MIN(len, strlength<T>(c_str));
+			cap = this->len + 1;
+			raw_data = new T[cap];
+			memcpy(raw_data, c_str, this->len * sizeof(T));
+			raw_data[this->len] = 0x00;
 		}
 		/*
 		*** string_base<T>(const string_base<T> &)
@@ -343,6 +368,10 @@ namespace str {
 		*** performs a reallocation with adjusted size and capacity
 		*** returns (modified) *this object
 		*** Version 1.2: Optimization, using memcpy() now
+		*** Version 1.3.5: 
+				raw_data[len] = 0x00; 
+			has been changed to
+				raw_data[this->len] = 0x00;
 		*/
 		string_base<T> &assign(const T *c_str, unsigned len) {
 			if (!*c_str || !len) return (*this);
@@ -384,6 +413,7 @@ namespace str {
 		*** returns (modified) *this object
 		*/
 		string_base<T> &assign(const T &ch, unsigned len) {
+			if (!len) return (*this);
 			delete[] raw_data;
 			this->len = len;
 			cap = len + 1;
