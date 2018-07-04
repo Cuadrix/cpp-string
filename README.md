@@ -50,15 +50,15 @@ A simple and fast C++ string class implementation.
   resize()          // change length of string 
   reverse()         // reverse content of string
   shrink()          // shrink capacity till it fits with (length() + 1)
-  size()            // returns size, actual storage uses, in bytes (till null-terminator)
-  stod()			// returns string as double 
-  stof()			// returns string as float
-  stol()			// returns string as long
-  stold()			// returns string as long double
-  stoll()			// returns string as long long
-  stoul()			// returns string as unsigned long
-  stoull()			// returns string as unsigned long long
-  substr()          // generate substring
+  size()		// returns size, actual storage uses, in bytes (till null-terminator)
+  stod()		// returns string as double 
+  stof()		// returns string as float
+  stol()		// returns string as long
+  stold()		// returns string as long double
+  stoll()		// returns string as long long
+  stoul()		// returns string as unsigned long
+  stoull()	// returns string as unsigned long long
+  substr()			// generate substring
   swap()            // swap content of two string instances
 ```
   
