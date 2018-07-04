@@ -352,7 +352,7 @@ namespace str {
 			cap = this->len + 1;
 			raw_data = new T[cap];
 			memcpy(raw_data, c_str, this->len * sizeof(T));
-			raw_data[len] = 0x00;
+			raw_data[this->len] = 0x00;
 			return (*this);
 		}
 		/*
