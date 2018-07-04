@@ -61,14 +61,16 @@
 	added "Version Log" table
 	added "TODO" list
 	increased performance of implementation by many times 
+*** 1.3:
+	Removed conflicting char contructor
+	Added some typedefs for large type names
+	Added functions to convert string to arithmetic types (using stol, stof, ...)
 */
 
 /*
 ==============================================
 === TODO								   ===
 ==============================================
-
-*** 1.3: exceptions
 */
 
 
@@ -84,7 +86,7 @@
 *** include this header for several functions 
 *** such as memcpy(), memset() and memmove()
 */
-#include <memory.h>
+#include <memory.h> /* for memmove(), memcpy() */
 #include <stdlib.h> /* include stdlib.h for realloc() function */
 
 /* 
@@ -104,7 +106,7 @@ capacity allocation for large or for smaller strings
 */
 #define DEF_LARGESTRING 0
 /* allocate DEF_ALLOC * sizeof(T) more space if required
-(It's a high number to minimize reallocations in program) [def: 8192] */
+(It's a high number to minimize reallocations in program) [def: 8192 or 16384] */
 #if (defined DEF_LARGESTRING && DEF_LARGESTRING > 0)
 	#define DEF_ALLOC 16384
 #else 
@@ -117,7 +119,7 @@ capacity allocation for large or for smaller strings
 *** Macro added with version 1.1
 *** Is changed on new release
 */
-#define STR_VERSION "1.2" 
+#define STR_VERSION "1.3" 
 
 #ifndef NULL
 	#define NULL 0
@@ -129,6 +131,13 @@ capacity allocation for large or for smaller strings
 
 /* namespace "str" */
 namespace str {
+	/* some typedefs for shorter code */
+	typedef unsigned _u_;					/* unsigned (int) */
+	typedef unsigned long _ul_;				/* unsigned long */
+	typedef unsigned long long _ull_;		/* unsigned long long */
+	typedef long long _ll_;					/* long long */
+	typedef long double _ld_;				/* long double */
+
 	/* TEMPLATE CLASS string_base<T> */
 	template <typename T>
 	class string_base {
@@ -158,18 +167,6 @@ namespace str {
 			: len(0), cap(capacity) {
 			raw_data = new T[cap];
 			raw_data[0] = 0x00;
-		}
-		/*
-		*** string_base<T>(const T &)
-		*** constructor to allocate DEF_STRCAP places by default
-		*** sets first charater to "ch" (given one)
-		*** sets second char to 0x00
-		*/
-		string_base<T>(const T &ch)
-			: len(1), cap(DEF_STRCAP) {
-			raw_data = new T[cap];
-			raw_data[0] = ch;
-			raw_data[1] = 0x00;
 		}
 		/*
 		*** string_base<T>(const T &, unsigned)
@@ -1420,7 +1417,31 @@ namespace str {
 		*********************************************************************************
 		*** OPERATOR OVERLOADS														  ***
 		*********************************************************************************
-		*** Code below overlodas some operators to create some pretty shortcuts of some 
+		*** The code below defines some functions to convert string to several arithmetic types
+		*** Added in Version 1.4
+		*** supported types:
+			-> long								[stol]
+			-> long long (_ll_)					[stoll]
+			-> unsigned long (_ul_)				[stoul]
+			-> unsigned long long (_ull_)		[stoull]
+			-> float							[stof]
+			-> double							[stod]
+			-> long double (_ld_)				[stold]
+		*/
+
+		long stol() { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; long r = strtol(x, NULL, 10); delete[] x; return r; }			/* -> long */
+		_ll_ stoll() { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; _ll_ r = strtoll(x, NULL, 10); delete[] x; return r; }			/* -> long long */
+		_ul_ stoul() { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; _ul_ r = strtoul(x, NULL, 10); delete[] x; return r; }			/* -> unsigned long */
+		_ull_ stoull() { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; _ull_ r = strtoull(x, NULL, 10); delete[] x; return r; }		/* -> unsigned long long */
+		float stof() { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; float r = strtof(x, NULL); delete[] x; return r; }				/* -> float */
+		double stod() { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; double r = strtod(x, NULL); delete[] x; return r; }			/* -> double */
+		_ld_ stold() { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; _ld_ r = strtold(x, NULL); delete[] x; return r; }				/* -> long double */
+
+		/*
+		*********************************************************************************
+		*** OPERATOR OVERLOADS														  ***
+		*********************************************************************************
+		*** Code below overloads some operators to create some pretty shortcuts of some 
 		function calls
 		*/
 
