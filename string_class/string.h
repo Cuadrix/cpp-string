@@ -73,6 +73,8 @@
 *** 1.3.5: 
 	Added contructor to copy chars from a C-String buffer
 	Fixed some mistakes when inserting null-terminator
+*** 1.4:
+	Added bindings to std::basic_string class
 */
 
 /*
@@ -99,6 +101,17 @@
 */
 #include <memory.h> /* for memmove(), memcpy() */
 #include <stdlib.h> /* include stdlib.h for realloc() function */
+
+/*
+*** define bindings to std::string and std::basic_ostream
+*** includes additional headers of the C++-template-library
+*** Added with Version 1.4
+*/
+#define DEF_USE_BINDINGS 1
+
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+	#include <string>
+#endif
 
 /* 
 *** default string capacity;
@@ -130,7 +143,7 @@ capacity allocation for large or for smaller strings
 *** Macro added with version 1.1
 *** Is changed on new release
 */
-#define STR_VERSION "1.3.5" 
+#define STR_VERSION "1.4" 
 
 /* define NULL macro if it's not defined by default */
 #ifndef NULL
@@ -154,9 +167,13 @@ namespace str {
 	template <typename T>
 	class string_base {
 	public:
-		typedef T *iterator;							/* normal iterator type */
-		typedef const T *const_iterator;				/* const iterator type */
-
+		typedef T *iterator;						/* normal iterator type */
+		typedef const T *const_iterator;			/* const iterator type */
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+		typedef std::basic_string<T, 
+			std::char_traits<T>, 
+			std::allocator<T>> std_string;			/* std::string typedef */
+#endif
 		/*
 		*** string_base<T>()
 		*** standard contructor
@@ -233,6 +250,21 @@ namespace str {
 			memcpy(raw_data, obj.raw_data, len * sizeof(T));
 			raw_data[len] = 0x00;
 		}
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+		/*
+		*** string_base<T>(const std_string &)
+		*** copy content from std::basic_string classes
+		*** copies allocated state as well
+		*** automatically inserts null-terminator at the end
+		*** Added with Version 1.4
+		*/
+		string_base<T>(const std_string &obj) 
+			: len(obj.length()), cap(obj.capacity()) {
+			raw_data = new T[cap];
+			memcpy(raw_data, obj.c_str(), len * sizeof(T));
+			raw_data[len] = 0x00;
+		}
+#endif
 		/*
 		*** string_base<T>(const string_base<T> &, unsigned, unsigned)
 		*** constructor to assign substring of "str" to current value 
@@ -253,6 +285,26 @@ namespace str {
 			memcpy(raw_data, str.raw_data + start, count * sizeof(T));
 			raw_data[len] = 0x00;
 		}
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+		/*
+		*** string_base<T>(const string_base<T> &, unsigned, unsigned)
+		*** constructor to assign substring of an std::basic_string sequence
+		(starting at position "start2 with a length of "count")
+		*** automatically inserts null-terminator at the end
+		*** if "start" is greater than str's length, then start = 0
+		*** Added with Version 1.4
+		*/
+		explicit string_base<T>(const std_string &str, unsigned start, unsigned count) {
+			unsigned l = str.length();
+			if (start > l) start = 0;
+			if ((start + count) > l)
+				count = (l - start);
+			len = count; cap = len + 1;
+			raw_data = new T[cap];
+			memcpy(raw_data, str.c_str() + start, count * sizeof(T));
+			raw_data[len] = 0x00;
+		}
+#endif
 		/*
 		*** string_base<T>(const T*, unsigned, unsigned)
 		*** constructor to assign substring of a C-String 
@@ -272,6 +324,16 @@ namespace str {
 			raw_data = new T[cap];
 			memcpy(raw_data, c_str + start, count * sizeof(T));
 			raw_data[len] = 0x00;
+		}
+		/*
+		*** ~string_base<T>()
+		*** default destructor to deallocate used memory 
+		*** You might consider using cleanup() instead
+		*** Readded with Version 1.4
+		*/
+		~string_base<T>() {
+			delete[] raw_data;
+			raw_data = NULL;
 		}
 
 		T *data() const { return raw_data; } /* returns C-String value */
@@ -405,6 +467,27 @@ namespace str {
 			raw_data[len] = 0x00;
 			return (*this);
 		}
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+		/*
+		*** string_base<T> &assign(const str_string &)
+		*** assign str's value to this string
+		*** old data is lost once you call this function
+		*** performs a reallocation with adjusted size and capacity
+		*** does nothing if
+			-> str's length is 0
+		*** returns (eventually modified) *this object
+		*** Added with Version 1.4
+		*/
+		string_base<T> &assign(const std_string &str) {
+			delete[] raw_data;
+			len = str.length();
+			cap = len + 1;
+			raw_data = new T[cap];
+			memcpy(raw_data, str.c_str(), len * sizeof(T));
+			raw_data[len] = 0x00;
+			return (*this);
+		}
+#endif
 		/*
 		*** string_base<T> &assign(const T &, unsigned len)
 		*** assigns ch's value to this string (actually, "len" times)
@@ -451,6 +534,23 @@ namespace str {
 			raw_data[len] = 0x00;
 			return (*this);
 		}
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+		/*
+		*** string_base<T> &assign(const std_string &, unsigned, unsigned)
+		*** assigns a substring of "str" (starting at "start" with a length 
+		of "count") to this string
+		*** old data is lost once you call this function
+		*** performs a reallocation with adjusted size and capacity
+		*** does nothing if
+			-> substring's length ("count") == 0
+		*** if "start" is greater than str's length, then start = 0
+		*** returns (eventually modified) *this object
+		*** Added with Versíon 1.4
+		*/
+		string_base<T> &assign(const std_string &str, unsigned start, unsigned count) {
+			return assign(str.c_str(), start, count);
+		}
+#endif
 		/*
 		*** string_base<T> &assign(const T *, unsigned, unsigned)
 		*** assigns a substring of "c_str" (starting at "start" with a length
@@ -561,6 +661,20 @@ namespace str {
 			raw_data[len] = 0x00;
 			return (*this);
 		}
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+		/*
+		*** string_base<T> &append(const std_string &)
+		*** appends str's value to this string
+		*** allocates much more memory if needed
+		*** does nothing if
+			-> str's length == 0
+		*** returns (eventually modified) *this object
+		*** Added with Version 1.4
+		*/
+		string_base<T> &append(const std_string &str) {
+			return append(str.c_str());
+		}
+#endif
 		/*
 		*** string_base<T> &append(const T *, unsigned)
 		*** appends the first "count" characters of c_str's value to this string
@@ -644,7 +758,23 @@ namespace str {
 			raw_data[len] = 0x00;
 			return (*this);
 		}
-
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1) 
+		/*
+		*** string_base<T> &append(const string_base<T> &, unsigned, unsigned)
+		*** appends a substring of "str" (starting at position "start" with a
+		length of "count") to this string
+		*** allocates much more memory if needed
+		*** does nothing if
+			-> substring's length ("count") == 0
+			-> str's length == 0
+		*** if "start" is greater than str's length, then start = 0
+		*** returns (eventually modified) *this object
+		*** Version 1.2: Optimization, using memcpy() now
+		*/
+		string_base<T> &append(const std_string &str, unsigned start, unsigned count) {
+			return append(str.c_str(), start, count);
+		}
+#endif
 		/*
 		*** string_base<T> &insert(const string_base<T> &, unsigned)
 		*** insert str's value at position "pos" in this string
@@ -703,6 +833,23 @@ namespace str {
 			raw_data[len] = 0x00;
 			return (*this);
 		}
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+		/*
+		*** string_base<T> &insert(const std_string &, unsigned, unsigned, unsigned)
+		*** inserts a substring of "str" (starting at position "start" with a length of
+		"count") at position "pos" in this string
+		*** allocates much more memory if needed
+		*** does nothing if
+			-> Given "pos" is greater than current value's length (this->length())
+			-> substring's length ("count") == 0
+		*** if "start" is greater than str's length, then start = 0
+		*** returns (eventually modified) *this object
+		*** Added with Version 1.4
+		*/
+		string_base<T> &insert(const std_string &str, unsigned pos, unsigned start, unsigned count) {
+			return insert(str.c_str(), pos, start, count);
+		}
+#endif
 		/*
 		*** string_base<T> &insert(const string_base<T> &, unsigned, unsigned)
 		*** inserts the first "count" characters of str's value at position "pos" in this string
@@ -732,6 +879,21 @@ namespace str {
 			raw_data[len] = 0x00;
 			return (*this);
 		}
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+		/*
+		*** string_base<T> &insert(const std_string &, unsigned, unsigned)
+		*** inserts the first "count" characters of str's value at position "pos" in this string
+		*** allocates much more memory if needed
+		*** does nothing if
+			-> Given "pos" is greater than current value's length (this->length())
+			-> str's length == 0
+		*** returns (eventually modified) *this object
+		*** Added with Version 1.4
+		*/
+		string_base<T> &insert(const std_string &str, unsigned pos, unsigned count) {
+			return insert(str.c_str(), pos, count);
+		}
+#endif
 		/*
 		*** string_base<T> &insert(const T *, unsigned)
 		*** inserts c_str's value at position "pos" in this string
@@ -1026,6 +1188,51 @@ namespace str {
 				++i, --s1count, --s2count;
 			return raw_data[s1pos + i] - str.raw_data[s2pos + i];
 		}
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1) 
+		/*
+		*** int compare(const std_string &) const
+		*** compares current string value with str's value
+		*** for return value, please look at the "string comparison table" table above
+		*** Added with Version 1.4
+		*/
+		int compare(const std_string &str) const {
+			unsigned i = 0;
+			while (raw_data[i] && raw_data[i] == str.c_str()[i]) ++i;
+			return raw_data[i] - str.c_str()[i];
+		}
+		/*
+		*** int compare(const std_string &, unsigned, unsigned) const
+		*** compares current string value with a substring of str's value
+		starting at position "start" with a length of "count"
+		*** for return value, please look at the "string comparison table" table above
+		*** Added with Version 1.4
+		*/
+		int compare(const std_string &str, unsigned start, unsigned count) const {
+			unsigned i = 0;
+			while (raw_data[i] && raw_data[i] == str.c_str()[start + i] && count)
+				--count, ++i;
+			return raw_data[i] - str.c_str()[start + i];
+		}
+		/*
+		*** int compare(const std_string &, unsigned, unsigned, unsigned, unsigned) const
+		*** compares a substring of current string with a substring of str's value
+		*** parameters:
+			-> str			- other string value which substring is compared with a substring of current value
+			-> s1pos		- starting position of current value's substring
+			-> s1count		- length of current value's substring
+			-> s2pos		- starting position of str's substring
+			-> s2count		- length of str's substring
+		*** for return value, please look at the "string comparison table" table above
+		*** Added with Version 1.4
+		*/
+		int compare(const std_string &str, unsigned s1pos, unsigned s1count, unsigned s2pos, unsigned s2count) const {
+			unsigned i = 0;
+			while (raw_data[s1pos + i] && raw_data[s1pos + i] == str.c_str()[s2pos + i] && s1count && s2count)
+				++i, --s1count, --s2count;
+			std::cout << "Code: " << raw_data[s1pos + i] << " " << str.c_str()[s2pos + i] << std::endl;
+			return raw_data[s1pos + i] - str.c_str()[s2pos + i];
+		}
+#endif
 		/*
 		*** int compare(const T *) const 
 		*** compares current string value with c_str's value 
@@ -1106,6 +1313,23 @@ namespace str {
 			}
 			return len;
 		}
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+		/*
+		*** unsigned find(const std_string &, unsigned = 0U)
+		*** returns position of the first occurrence of needle's value in current string value
+		*** "pos" is the first position which should be considered as the beginning of the seeked string
+		*** does nothing if
+			-> current string's length == 0
+			-> current string's length is less than needle's length
+			-> needle's length == 0
+		*** returns position of first occurence of needle's value or string's length if it has not been found
+		*** implementation is based on this article: https://stackoverflow.com/questions/12784766/check-substring-exists-in-a-string-in-c
+		*** Added with Version 1.4
+		*/
+		unsigned find(const std_string &needle, unsigned pos = 0U) {
+			return find(needle.c_str(), pos);
+		}
+#endif
 		/*
 		*** unsigned find(const T *, unsigned = 0U)
 		*** returns position of the first occurrence of needle's value in current string value 
@@ -1220,6 +1444,21 @@ namespace str {
 			insert(replace, start);
 			return (*this);
 		}
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+		/*
+		*** string_base<T> &replace(const std_string &, unsigned, unsigned)
+		*** replaces a substring of current string value (starting at position
+		"start" with a length of "count") with replace's value
+		*** returns (modified) *this object
+		*** Added with Version 1.4
+		*/
+		string_base<T> &replace(const std_string &replace, unsigned start, unsigned count) {
+			if (start >= len || len < (start + count)) return (*this);
+			erase(start, count);
+			insert(replace.c_str(), start);
+			return (*this);
+		}
+#endif
 		/*
 		*** string_base<T> &replace(const T *, unsigned, unsigned)
 		*** replaces a substring of current string value (starting at position 
@@ -1255,6 +1494,24 @@ namespace str {
 			insert(replace, pos);
 			return (*this);
 		}
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+		/*
+		*** string_base<T> &replace(const std_string &, const std_string &)
+		*** replaces element's value in current string (if found in current string value) with replace's value
+		*** does nothing if
+			-> current string value equals to replace's value
+			-> element's value has not been found in current string value
+		*** returns (eventually modified) *this object
+		*** Added with Version 1.4
+		*/
+		string_base<T> &replace(const std_string &element, const std_string &replace) {
+			unsigned pos = find(element, 0);
+			if (pos == len) return (*this);
+			erase(pos, element.length());
+			insert(replace.c_str(), pos);
+			return (*this);
+		}
+#endif
 		/*
 		*** string_base<T> &replace(const T *, const T *)
 		*** replaces element's value in current string (if found in current string value) with replace's value
@@ -1303,9 +1560,15 @@ namespace str {
 		void push_back(const T &ch) { append(ch); }									/* append ch's value to current value */
 		void push_back(const T *c_str) { append(c_str); }							/* append c_str's value to current value */	
 		void push_back(const string_base<T> &str) { append(str); }					/* append str's value to current value */
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+		void push_back(const std_string &str) { append(str); }						/* append std::basic_string value */
+#endif
 		void push_front(const T &ch) { insert(ch, 0); }								/* insert ch's value at string's front */
 		void push_front(const T *c_str) { insert(c_str, 0); }						/* insert c_str's value at string's front */
 		void push_front(const string_base<T> &str) { insert(str, 0); }				/* insert str's value at string's front */
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+		void push_front(const std_string &str) { insert(str, 0); }					/* insert std::basic_string value at front */
+#endif
 		void pop_back(unsigned count = 1) { erase(len - count, count); }			/* delete last "count" characters from string's back */	
 		void pop_front(unsigned count = 1) { erase(0, count); }						/* delete first "count" characters from string's front */
 		/*
@@ -1496,10 +1759,16 @@ namespace str {
 		string_base<T> &operator =(const T &ch) { return assign(ch, 1); }					/* assign ch's value to current string value */
 		string_base<T> &operator =(const T *c_str) { return assign(c_str); }				/* assign c_str's value to current string value */
 		string_base<T> &operator =(const string_base<T> &str) { return assign(str); }		/* assign a str's value to current string value */
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+		string_base<T> &operator =(const std_string &str) { return assign(str); }			/* assign std::basic_string value to current string */
+#endif
 
 		string_base<T> &operator +=(const T &ch) { return append(ch); }						/* append (concatenate) ch's value to current string value */
 		string_base<T> &operator +=(const T *c_str) { return append(c_str); }				/* append c_str's value to current string value */
 		string_base<T> &operator +=(const string_base<T> &str) { return append(str); }		/* append str's value to current string value */
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+		string_base<T> &operator +=(const std_string &str) { return append(str); }			/* append std::basic_string value to current string */
+#endif
 
 		string_base<T> &operator -=(const T &ch) { return remove(ch); }						/* remove all characters with equal to ch's value from current string */
 
@@ -1507,9 +1776,15 @@ namespace str {
 
 		bool operator ==(const T *c_str) { return compare(c_str) == 0; }					/* check whether *this == c_str */
 		bool operator ==(const string_base<T> &right) { return compare(right) == 0; }		/* check whether *this == right */
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+		bool operator ==(const std_string &right) { return compare(right) == 0; }			/* check whether *this == right (std::basic_string) */
+#endif
 
 		bool operator !=(const T *c_str) { return compare(c_str) != 0; }					/* check whether *this != c_str */
 		bool operator !=(const string_base<T> &right) { return compare(right) != 0; }		/* check whether *this != right */
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+		bool operator !=(const std_string &right) { return compare(right) != 0; }			/* check whether *this != right (std::basic_string) */
+#endif
 
 		/*
 		*********************************************************************
@@ -1544,6 +1819,13 @@ namespace str {
 		inline bool operator <(const string_base<T> &str) { return compare(str) < 0; }		/* check whether *this < str */
 		inline bool operator >=(const string_base<T> &str) { return compare(str) >= 0; }	/* check whether *this >= str */
 		inline bool operator <=(const string_base<T> &str) { return compare(str) <= 0; }	/* check whether *this <= str */
+
+#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+		inline bool operator >(const std_string &str) { return compare(str) > 0; }			/* check whether *this > str */
+		inline bool operator <(const std_string &str) { return compare(str) < 0; }			/* check whether *this < str */
+		inline bool operator >=(const std_string &str) { return compare(str) >= 0; }		/* check whether *this >= str */
+		inline bool operator <=(const std_string &str) { return compare(str) <= 0; }		/* check whether *this <= str */
+#endif
 
 		/* end of public segment */
 	private:
