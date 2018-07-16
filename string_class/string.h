@@ -172,7 +172,7 @@ namespace str {
 #if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
 		typedef std::basic_string<T, 
 			std::char_traits<T>, 
-			std::allocator<T>> std_string;			/* std::string typedef */
+			std::allocator<T> > std_string;			/* std::string typedef */
 #endif
 		/*
 		*** string_base<T>()
