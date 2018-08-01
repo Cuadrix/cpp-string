@@ -75,12 +75,26 @@
 	Fixed some mistakes when inserting null-terminator
 *** 1.4:
 	Added bindings to std::basic_string class
+	Readded destructor 
+*** 1.5: 
+	Added macro DEF_USE_CLEANUP_FUNCTION to enable or disable void cleanup() member function
+	Added fill function implementations
+	(Since it will crash when being called by a non-pointer type)
+	Copied comment to destructor 
+	C++98 fix (template bug when having nested templates (">>" -> "> >")
+	Modified number conversion methods to be const
+	Some tiny typo-fixes
+	Made third parameter of replace(const T &, const T &, unsigned) optional
+	Changed self-defined NULL macro to ((void *)0) 
+	Added a memset-like function in private section to fill string buffer with specified char (currently unused)
+	Invented "reference" and "const_reference" typedefs for T & and const T &
 */
 
 /*
 ==============================================
 === TODO								   ===
 ==============================================
+assertions (1.6)
 ...
 ...
 ...
@@ -105,6 +119,8 @@
 /*
 *** define bindings to std::string and std::basic_ostream
 *** includes additional headers of the C++-template-library
+*** Currently includes:
+	-> std::basic_string<T>
 *** Added with Version 1.4
 */
 #define DEF_USE_BINDINGS 1
@@ -143,13 +159,20 @@ capacity allocation for large or for smaller strings
 *** Macro added with version 1.1
 *** Is changed on new release
 */
-#define STR_VERSION "1.4" 
+#define STR_VERSION "1.5" 
 
 /* define NULL macro if it's not defined by default */
 #ifndef NULL
-	#define NULL 0
+	#define NULL ((void *)0)
 #endif
 
+/*
+*** some tiny helper-macros for string class
+----------------
+*** ABS => return absolute value
+*** MIN => return least value
+*** MAX => return highest value
+*/
 #define ABS(x) (x >= 0 ? x : -x) /* return absolute value of x */
 #define MIN(x, y) (x > y ? y : x) /* return lower value of x and y */
 #define MAX(x, y) (x > y ? x : y) /* return higher value of x and y */
@@ -169,6 +192,8 @@ namespace str {
 	public:
 		typedef T *iterator;						/* normal iterator type */
 		typedef const T *const_iterator;			/* const iterator type */
+		typedef T &reference;						/* normal reference type */
+		typedef const T &const_reference;			/* const reference type */
 #if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
 		typedef std::basic_string<T, 
 			std::char_traits<T>, 
@@ -328,11 +353,13 @@ namespace str {
 		/*
 		*** ~string_base<T>()
 		*** default destructor to deallocate used memory 
-		*** You might consider using cleanup() instead
+		*** You might consider using cleanup() instead 
+		(define DEF_USE_CLEANUP_FUNCTION to make it available)
 		*** Readded with Version 1.4
 		*/
 		~string_base<T>() {
 			delete[] raw_data;
+			/* C++98 support by avoiding nullptr */
 			raw_data = NULL;
 		}
 
@@ -347,7 +374,7 @@ namespace str {
 		*** if "pos" is out of range, it returns the last char of string (len - 1)
 		*** Version 1.2: Optimizing, remove "ac_len" variable
 		*/
-		T &at(unsigned pos) { return raw_data[(pos > (len - 1) ? (len - 1) : pos)]; }
+		reference at(unsigned pos) { return raw_data[(pos > (len - 1) ? (len - 1) : pos)]; }
 		/*
 		*** const T &at(unsigned) const
 		*** returns reference to a character at position "pos"
@@ -356,7 +383,7 @@ namespace str {
 		"at" is called outside of the class
 		*** Version 1.2: Optimizing, remove "ac_len" variable
 		*/
-		const T &at(unsigned pos) const { return raw_data[(pos > (len - 1) ? (len - 1) : pos)]; }
+		const_reference at(unsigned pos) const { return raw_data[(pos > (len - 1) ? (len - 1) : pos)]; }
 		/*
 		*** bool at(const T, unsigned)
 		*** checks if given character "ch" is at given position "pos"
@@ -370,7 +397,7 @@ namespace str {
 		*** returns reference to first char of string 
 		*** can be also used to change value of first char
 		*/
-		T &first() { return raw_data[0]; }
+		reference first() { return raw_data[0]; }
 		/*
 		*** const T &first() const
 		*** returns reference to first char of string
@@ -378,13 +405,13 @@ namespace str {
 		it returns this function when "first" is called 
 		outside of the class
 		*/
-		const T &first() const { return raw_data[0]; }
+		const_reference first() const { return raw_data[0]; }
 		/* 
 		*** T &last()
 		*** returns reference to last char of string 
 		*** can be also used to change value of last char
 		*/
-		T &last() {
+		reference last() {
 			if (!len) return raw_data[0];
 			return raw_data[len - 1];
 		}
@@ -395,7 +422,7 @@ namespace str {
 		it returns this function when "last" is called
 		outside of the class
 		*/
-		const T &last() const {
+		const_reference last() const {
 			if (!len) return raw_data[0];
 			return raw_data[len - 1];
 		}
@@ -404,6 +431,66 @@ namespace str {
 		iterator end() const { return &raw_data[len]; } /* returns iterator to the ending of string */
 		const_iterator cbegin() const { return &raw_data[0]; } /* returns constant iterator to the beginning of string */
 		const_iterator cend() const { return &raw_data[len]; } /* returns constant iterator to the ending of string */
+
+		/*
+		*** string_base<T> &fill(const T &)
+		*** fill whole string buffer with T's value
+		*** inserts null-terminator at the end
+		*** Does nothing if
+			-> len == 0 (string is empty)
+			-> raw_data == NULL (allocation error)
+		*** returns (eventually modified) *this object
+		*** Added with Version 1.5
+		*/
+		string_base<T> &fill(const T &ch) {
+			if (!len || !raw_data) return (*this);
+			for (unsigned i = 0; i < len; i++)
+				raw_data[i] = ch;
+			raw_data[len] = 0x00;
+			return (*this);
+		}
+		/*
+		*** string_base<T> &fill(const T &)
+		*** fill first "count" places in 
+		string buffer with T's value
+		*** inserts null-terminator at the end
+		*** Does nothing if
+			-> len == 0 (string is empty)
+			-> raw_data == NULL (allocation error)
+			-> count == 0 (no chars to copy)
+		*** returns (eventually modified) *this object
+		*** Added with Version 1.5
+		*/
+		string_base<T> &fill(const T &ch, unsigned count) {
+			if (!len || !count || !raw_data) return (*this);
+			unsigned ac_len = MIN(count, len);
+			for (unsigned i = 0; i < ac_len; i++)
+				raw_data[i] = ch;
+			raw_data[len] = 0x00;
+			return (*this);
+		}
+		/*
+		*** string_base<T> &fill(const T &)
+		*** fill substring of string buffer with T's value
+		*** inserts null-terminator at the end
+		*** Does nothing if
+			-> len == 0 (string is empty)
+			-> raw_data == NULL (allocation error)
+			-> count == 0 (no chars to copy)
+		*** If start is greater than current string length, then start = 0
+		*** returns (eventually modified) *this object
+		*** Added with Version 1.5
+		*/
+		string_base<T> &fill(const T &ch, unsigned start, unsigned count) {
+			if (!len || !count || !raw_data) 
+				return (*this);
+			if (start > len) start = 0;
+			if ((start + count) > len) count = (len - start);
+			for (unsigned i = start; i < (start + count); i++)
+				raw_data[i] = ch;
+			raw_data[len] = 0x00;
+			return (*this);
+		}
 
 		/*
 		*** string_base<T> &assign(const T *)
@@ -1029,7 +1116,7 @@ namespace str {
 		*** Version 1.2: Optimizing, using memmove() now
 		*/
 		string_base<T> &erase(unsigned pos) {
-			if (pos > (len - 1)) return (*this);
+			if (pos > (len - 1) || !len) return (*this);
 			memmove(raw_data + pos, raw_data + pos + 1, (len - pos) * sizeof(T));
 			--this->len;
 			raw_data[len] = 0x00;
@@ -1045,7 +1132,7 @@ namespace str {
 		*** Version 1.2: Optimizing, using memmove() now
 		*/
 		string_base<T> &erase(unsigned pos, unsigned count) {
-			if (pos > (len - 1)) return (*this);
+			if (pos > (len - 1) || !len) return (*this);
 			if ((pos + count) > len) count = (len - pos);
 			memmove(raw_data + pos, raw_data + pos + count, (len - count - pos) * sizeof(T));
 			this->len -= count;
@@ -1229,7 +1316,6 @@ namespace str {
 			unsigned i = 0;
 			while (raw_data[s1pos + i] && raw_data[s1pos + i] == str.c_str()[s2pos + i] && s1count && s2count)
 				++i, --s1count, --s2count;
-			std::cout << "Code: " << raw_data[s1pos + i] << " " << str.c_str()[s2pos + i] << std::endl;
 			return raw_data[s1pos + i] - str.c_str()[s2pos + i];
 		}
 #endif
@@ -1533,7 +1619,7 @@ namespace str {
 			-> Given index ("pos") is greater or equals to current string's length
 		*** returns (eventually modified) *this object
 		*/
-		string_base<T> &replace(const T &element, const T &replace, unsigned pos) {
+		string_base<T> &replace(const T &element, const T &replace, unsigned pos = 0U) {
 			if (pos >= len) return (*this);
 			for (unsigned i = pos; i < len; i++)
 				if (raw_data[i] == element)
@@ -1691,6 +1777,7 @@ namespace str {
 			len = 0; cap = DEF_STRCAP;
 		}
 
+#ifdef DEF_USE_CLEANUP_FUNCTION
 		/*
 		*** void cleanup()
 		*** custom destructor you can call if you 
@@ -1698,6 +1785,7 @@ namespace str {
 		*** this object and all of its members will be invalided after calling this function
 		*** All data is lost when calling this 
 		*** Version 1.1: add this function and remove default destructor
+		*** Version 1.5: define DEF_USE_CLEANUP_FUNCTION to enable this function
 		*/
 		void cleanup() {
 			delete[] raw_data;
@@ -1705,6 +1793,7 @@ namespace str {
 			raw_data = NULL;
 			delete this;
 		}
+#endif
 
 		/*
 		*********************************************************************************
@@ -1722,13 +1811,13 @@ namespace str {
 			-> long double (_ld_)				[stold]
 		*/
 
-		long stol() { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; long r = strtol(x, NULL, 10); delete[] x; return r; }			/* -> long */
-		_ll_ stoll() { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; _ll_ r = strtoll(x, NULL, 10); delete[] x; return r; }			/* -> long long */
-		_ul_ stoul() { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; _ul_ r = strtoul(x, NULL, 10); delete[] x; return r; }			/* -> unsigned long */
-		_ull_ stoull() { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; _ull_ r = strtoull(x, NULL, 10); delete[] x; return r; }		/* -> unsigned long long */
-		float stof() { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; float r = strtof(x, NULL); delete[] x; return r; }				/* -> float */
-		double stod() { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; double r = strtod(x, NULL); delete[] x; return r; }			/* -> double */
-		_ld_ stold() { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; _ld_ r = strtold(x, NULL); delete[] x; return r; }				/* -> long double */
+		long stol() const { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; long r = strtol(x, NULL, 10); delete[] x; return r; }			/* -> long */
+		_ll_ stoll() const { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; _ll_ r = strtoll(x, NULL, 10); delete[] x; return r; }			/* -> long long */
+		_ul_ stoul() const { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; _ul_ r = strtoul(x, NULL, 10); delete[] x; return r; }			/* -> unsigned long */
+		_ull_ stoull() const { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; _ull_ r = strtoull(x, NULL, 10); delete[] x; return r; }		/* -> unsigned long long */
+		float stof() const { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; float r = strtof(x, NULL); delete[] x; return r; }				/* -> float */
+		double stod() const { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; double r = strtod(x, NULL); delete[] x; return r; }			/* -> double */
+		_ld_ stold() const { char *x = new char[len]; for (_u_ i = 0; i < len; i++) x[i] = raw_data[i] & 0x7F; _ld_ r = strtold(x, NULL); delete[] x; return r; }				/* -> long double */
 
 		/*
 		*********************************************************************************
@@ -1770,7 +1859,7 @@ namespace str {
 		string_base<T> &operator +=(const std_string &str) { return append(str); }			/* append std::basic_string value to current string */
 #endif
 
-		string_base<T> &operator -=(const T &ch) { return remove(ch); }						/* remove all characters with equal to ch's value from current string */
+		string_base<T> &operator -=(const T &ch) { return remove(ch); }						/* remove all characters which equal to ch's value from current string */
 
 		string_base<T> &operator ~() { reverse(); return *this; }							/* operator overload to reverse string */
 
@@ -1833,8 +1922,10 @@ namespace str {
 		unsigned len, cap;	/* len = length of string / cap = capacity of string */
 
 		/*
-		*** private function which is used to get the length of str's C-String value with value_type "T_"
-		*** only used within the class, not outside (and also not reachable from outside the class)
+		*** private function which is used to get the 
+		length of str's C-String value with value_type "T_"
+		*** only used within the class, not outside 
+		(and also not reachable from outside the class)
 		*/
 		template <typename T_>
 		static unsigned strlength(const T_ *c_str) {
@@ -1843,6 +1934,23 @@ namespace str {
 			unsigned res = 0;
 			for (; c_str[res] != 0x00; res++);
 			return res;
+		}
+
+		/*
+		*** private function to fill string buffer
+		*** (uses a memset-like algorithm)
+		*** works with every template type 
+		(memset has problems with char32_t, 
+		therefore I made a similar function. It
+		is currently unused but may be used for other 
+		functions in the future)
+		*** returns dest (parameter 1)
+		*/
+		template <typename T__>
+		static T__ *fill_str(T__ *dest, const T__ &val, _u_ len) {
+			register const T__ *p = dest;
+			while (len-- > 0) *p++ = val;
+			return dest;
 		}
 
 		/* end of private segment */
