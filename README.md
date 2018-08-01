@@ -35,6 +35,7 @@ A simple and fast C++ string class implementation.
   empty()           // checks whether string is empty
   end()             // returns iterator to the ending
   erase()           // erase from string
+  fill()			// fill string with char value 
   find()            // find within string
   first()           // return reference to first character
   insert()          // insert into string
@@ -62,6 +63,54 @@ A simple and fast C++ string class implementation.
   substr()          // generate substring
   swap()            // swap content of two string instances
 ```
+
+### [F U N C T I O N S]<br>
+  This library covers the following methods:
+
+  | Method Name | Overload Count | Parameter Count | Return Value | Description |
+  | --- | --- | --- | --- | --- |
+  | assign()     | 8 | 1 - 3 | modified string object | 
+  | append()     | 9 | 1 - 3 | modified string object | 
+  | at()         | 3 | 1 - 2 | (const) T &, bool | 
+  | begin()      | 1 | 0 | iterator to the beginning |
+  | capacity()   | 1 | 0 | capacity of current allocated state |
+  | cbegin()     | 1 | 0 | const iterator to the beginning |
+  | cend()       | 1 | 0 | const iterator to the ending |
+  | cleanup()    | 1 | 0 | void |
+  | clear()      | 1 | 0 | void |
+  | compare()    | 10 | 1 - 5 | compare value |
+  | c_str()      | 1 | 0 | const string buffer |
+  | data()       | 1 | 0 | string buffer |
+  | empty()      | 1 | 0 | if string is empty true, else false |
+  | end()        | 1 | 0 | return iterator to the ending |
+  | erase()      | 2 | 1 - 2 | modified string object |
+  | fill()		 | 3 | 1 - 3 | modified string object |
+  | find()       | 6 | 1 - 3 | position of seeked sequence within string object |
+  | first()      | 2 | 0 | reference to first char |
+  | insert()     | 10 | 2 - 4 | modified string object |
+  | last()       | 
+  | length()     | 
+  | pop_back()   | 
+  | pop_front()  | 
+  | push_back()  | 
+  | push_front() | 
+  | remove()     | 
+  | replace()    | 
+  | reserve()    | 
+  | reset()      | 
+  | resize()     | 
+  | reverse()    | 
+  | shrink()     | 
+  | size()       | 
+  | stod()	  	 | 
+  | stof()	  	 | 
+  | stol()       | 
+  | stold()	  	 | 
+  | stoll()	  	 | 
+  | stoul()	  	 | 
+  | stoull()	 |  
+  | substr()     | 
+  | swap()       |   
   
   
 ### [P E R F O R M A N C E]<br>
