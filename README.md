@@ -19,53 +19,6 @@ A simple and fast C++ string class implementation.
 
 ### [F U N C T I O N S]<br>
   This library covers the following methods:
-  ```cpp
-  assign()          // assign content to string
-  append()          // append content to string
-  at()              // returns reference to character
-  begin()           // returns iterator to the beginning
-  capacity()        // returns string's capacity
-  cbegin()          // returns constant iterator to the beginning
-  cend()            // returns constant iterator to the ending
-  cleanup()         // deallocate string, use this function as a replacement of "delete"
-  clear()           // clear string (destroy content)
-  compare()         // compare string to other strings (or sequences)
-  c_str()           // return C-String value
-  data()            // return pointer to internal storage 
-  empty()           // checks whether string is empty
-  end()             // returns iterator to the ending
-  erase()           // erase from string
-  fill()			// fill string with char value 
-  find()            // find within string
-  first()           // return reference to first character
-  insert()          // insert into string
-  last()            // return reference to last character
-  length()          // return string's length
-  pop_back()        // erase from ending
-  pop_front()       // erase from beginning
-  push_back()       // append to the ending 
-  push_front()      // insert at beginning
-  remove()          // remove specified chars
-  replace()         // replace sequences with other sequences
-  reserve()         // allocate more memory
-  reset()           // reset string to default settings (standard constructor)
-  resize()          // change length of string 
-  reverse()         // reverse content of string
-  shrink()          // shrink capacity till it fits with (length() + 1)
-  size()            // returns size, actual storage uses, in bytes (till null-terminator)
-  stod()	          // returns string as double 
-  stof()	          // returns string as float
-  stol()            // returns string as long
-  stold()	          // returns string as long double
-  stoll()	          // returns string as long long
-  stoul()	          // returns string as unsigned long
-  stoull()	        // returns string as unsigned long long
-  substr()          // generate substring
-  swap()            // swap content of two string instances
-```
-
-### [F U N C T I O N S]<br>
-  This library covers the following methods:
 
   | Method Name | Overload Count | Parameter Count | Return Value | Description |
   | --- | --- | --- | --- | --- |
@@ -87,7 +40,7 @@ A simple and fast C++ string class implementation.
   | fill()		 | 3 | 1 - 3 | modified string object |
   | find()       | 6 | 1 - 3 | position of seeked sequence within string object |
   | first()      | 2 | 0 | reference to first char |
-  | insert()     | 10 | 2 - 4 | modified string object |
+  | insert()     | 10 | 2 - 4 | modified string object | 
   | last()       | 
   | length()     | 
   | pop_back()   | 
