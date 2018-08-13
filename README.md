@@ -12,13 +12,16 @@ A simple and fast C++ string class implementation.
   - easy usage
   - nice performance 
   - iterators
+  - cross-platform (tested on Windows, Linux and macOS)
   - handy template usage (char, wchar_t, char16_t, char32_t)
   - C++98 compatibility 
-  - bindings to std::basic_string (since Version 1.4)
+  - bindings to std::basic_string (since Version **1.4**)
+  - easy debugging using assertions (since Version **1.6**)
+  - Latest Version: **1.6**
 
 
 ### [F U N C T I O N S]<br>
-  This library covers the following methods:
+  This library currently covers the following methods:
 
   | Method Name | Overload Count | Parameter Count | Return Value | Description |
   | --- | --- | --- | --- | --- |
@@ -64,6 +67,38 @@ A simple and fast C++ string class implementation.
   | stoull()	 | 1 | 0 | string as unsigned long long |						returns string as unsigned long long										|
   | substr()     | 1 | 2 | modified string object |								generate substring															|
   | swap()       | 1 | 1 | void |												swap content of two string instances										|
+
+
+### [U S A G E - E X A M P L E]<br>
+```cpp
+#define STR_LARGESTRING             /* define this for large string allocation */
+#define STR_USE_CLEANUP_FUNCTION    /* define this to enable cleanup() function (NOT recommended) */
+#define STR_USE_BINDINGS            /* define this to enable bindings to std::basic_string */
+#define STR_USE_ASSERTIONS          /* define this to enable assertions to debug code easier */
+
+#include <stdio.h>  /* include this for output functions */
+#include <time.h>   /* include this for time measuring */
+/* 
+it's important that the settings 
+(these macros above are defined BEFORE 
+the library itself is included, otherwise 
+your settings will not work properly 
+*/
+#include "string.h"   /* include string library */
+
+int main(int argc, char **argv) {
+  unsigned time = clock();        /* start clock */
+  
+  str::string a = "Hello world!";     /* create a new string object and set it to "Hello World!" */
+  printf("a = \"%s\"\n", a.c_str());  /* output it, should say "a = "Hello World!"" */
+  a.replace("Hello", "Goodbye");      /* replace "Hello" with "Goodbye" */
+  printf("a = \"%s\"\n", a.c_str());  /* output it again, should print "a = "Goodbye World!"" */
+  
+  printf("Elapsed Time: %g seconds\n", (double)(clock() - time) / CLOCKS_PER_SEC);  /* print elapsed time */
+  getchar();   /* wait for user to terminate the program */
+  return 0;    /* leave the program, destroying "a" and "time" automatically */
+}
+```
   
   
 ### [P E R F O R M A N C E]<br>

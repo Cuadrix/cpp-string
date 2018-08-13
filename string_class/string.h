@@ -88,22 +88,26 @@
 	Changed self-defined NULL macro to ((void *)0) 
 	Added a memset-like function in private section to fill string buffer with specified char (currently unused)
 	Invented "reference" and "const_reference" typedefs for T & and const T &
+*** 1.6:
+	Finally deleted useless #pragma once (since I'm using include guards)
+	Added assertions (added DEF_USE_ASSERTIONS setting)
+	Just define some macros somewhere in your code before including this library to affect functionality of it
+	Added an usage example in README.md + added version label to feature list
+	Changed macro prefix from DEF_ to STR_
 */
 
 /*
 ==============================================
 === TODO								   ===
+=== ? - thinking of						   ===
 ==============================================
-assertions (1.6)
-...
-...
-...
-*/
+copy() and splice() functions (1.7)
+tokenizer ? (1.8)
+case sensitive finding ? (1.9)
+*/ 
 
 
-/* avoid this header file being included multiple times */
-#pragma once		
-
+/* avoid this header file being included multiple times */		
 #ifndef STRING_H
 #define STRING_H
 
@@ -115,6 +119,10 @@ assertions (1.6)
 */
 #include <memory.h> /* for memmove(), memcpy() */
 #include <stdlib.h> /* include stdlib.h for realloc() function */
+/* define STR_USE_ASSERTIONS somewhere in your code to enable assertions */
+#ifdef STR_USE_ASSERTIONS 
+	#include <assert.h> /* for assert() */
+#endif
 
 /*
 *** define bindings to std::string and std::basic_ostream
@@ -123,9 +131,8 @@ assertions (1.6)
 	-> std::basic_string<T>
 *** Added with Version 1.4
 */
-#define DEF_USE_BINDINGS 1
 
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+#ifdef STR_USE_BINDINGS 
 	#include <string>
 #endif
 
@@ -134,23 +141,17 @@ assertions (1.6)
 *** (for standard constructor and so on) [def: 32] 
 *** Version 1.1: def(8) -> def(32)
 */
-#define DEF_STRCAP 32
+#define STR_DEFSTRCAP 32
 
 /*
 *** DEF_LARGESTRING is a setting to optimize 
-capacity allocation for large or for smaller strings
-*** DEF_LARGESTRING > 1 => large string optimization 
-*** DEF_LARGESTRING < 1 => small string optimization 
-***
-*** default: DEF_LARGESTRING 0
-*/
-#define DEF_LARGESTRING 0
-/* allocate DEF_ALLOC * sizeof(T) more space if required
+capacity allocation for large or for smaller strings 
+*** allocate DEF_ALLOC * sizeof(T) more space if required
 (It's a high number to minimize reallocations in program) [def: 8192 or 16384] */
-#if (defined DEF_LARGESTRING && DEF_LARGESTRING > 0)
-	#define DEF_ALLOC 16384
-#else 
-	#define DEF_ALLOC 8192
+#ifdef STR_LARGESTRING 
+	#define STR_ALLOC 16384
+#else
+	#define STR_ALLOC 8192
 #endif
 
 /* 
@@ -159,7 +160,7 @@ capacity allocation for large or for smaller strings
 *** Macro added with version 1.1
 *** Is changed on new release
 */
-#define STR_VERSION "1.5" 
+#define STR_VERSION "1.6" 
 
 /* define NULL macro if it's not defined by default */
 #ifndef NULL
@@ -194,7 +195,7 @@ namespace str {
 		typedef const T *const_iterator;			/* const iterator type */
 		typedef T &reference;						/* normal reference type */
 		typedef const T &const_reference;			/* const reference type */
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+#ifdef STR_USE_BINDINGS
 		typedef std::basic_string<T, 
 			std::char_traits<T>, 
 			std::allocator<T> > std_string;			/* std::string typedef */
@@ -208,8 +209,8 @@ namespace str {
 		*** use reset() to restore these settings
 		*/
 		explicit string_base<T>()
-			: len(0), cap(DEF_STRCAP) {
-			raw_data = new T[DEF_STRCAP];
+			: len(0), cap(STR_DEFSTRCAP) {
+			raw_data = new T[STR_DEFSTRCAP];
 			raw_data[0] = 0x00;
 		} 
 		/*
@@ -275,7 +276,7 @@ namespace str {
 			memcpy(raw_data, obj.raw_data, len * sizeof(T));
 			raw_data[len] = 0x00;
 		}
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+#ifdef STR_USE_BINDINGS
 		/*
 		*** string_base<T>(const std_string &)
 		*** copy content from std::basic_string classes
@@ -310,7 +311,7 @@ namespace str {
 			memcpy(raw_data, str.raw_data + start, count * sizeof(T));
 			raw_data[len] = 0x00;
 		}
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+#ifdef STR_USE_BINDINGS
 		/*
 		*** string_base<T>(const string_base<T> &, unsigned, unsigned)
 		*** constructor to assign substring of an std::basic_string sequence
@@ -441,9 +442,13 @@ namespace str {
 			-> raw_data == NULL (allocation error)
 		*** returns (eventually modified) *this object
 		*** Added with Version 1.5
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		string_base<T> &fill(const T &ch) {
-			if (!len || !raw_data) return (*this);
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+#endif
+			if (!len) return (*this);
 			for (unsigned i = 0; i < len; i++)
 				raw_data[i] = ch;
 			raw_data[len] = 0x00;
@@ -460,9 +465,13 @@ namespace str {
 			-> count == 0 (no chars to copy)
 		*** returns (eventually modified) *this object
 		*** Added with Version 1.5
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		string_base<T> &fill(const T &ch, unsigned count) {
-			if (!len || !count || !raw_data) return (*this);
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+#endif
+			if (!len || !count) return (*this);
 			unsigned ac_len = MIN(count, len);
 			for (unsigned i = 0; i < ac_len; i++)
 				raw_data[i] = ch;
@@ -480,10 +489,13 @@ namespace str {
 		*** If start is greater than current string length, then start = 0
 		*** returns (eventually modified) *this object
 		*** Added with Version 1.5
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		string_base<T> &fill(const T &ch, unsigned start, unsigned count) {
-			if (!len || !count || !raw_data) 
-				return (*this);
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+#endif
+			if (!len || !count) return (*this);
 			if (start > len) start = 0;
 			if ((start + count) > len) count = (len - start);
 			for (unsigned i = start; i < (start + count); i++)
@@ -554,7 +566,7 @@ namespace str {
 			raw_data[len] = 0x00;
 			return (*this);
 		}
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+#ifdef STR_USE_BINDINGS
 		/*
 		*** string_base<T> &assign(const str_string &)
 		*** assign str's value to this string
@@ -621,7 +633,7 @@ namespace str {
 			raw_data[len] = 0x00;
 			return (*this);
 		}
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+#ifdef STR_USE_BINDINGS
 		/*
 		*** string_base<T> &assign(const std_string &, unsigned, unsigned)
 		*** assigns a substring of "str" (starting at "start" with a length 
@@ -673,15 +685,18 @@ namespace str {
 			-> first character of c_str's value == 0x00
 		*** returns (eventually modified) *this object
 		*** Version 1.2: Optimization, using memcpy() now
+		*** Version 1.6: Added assertions to make debugging the program easier 
 		*/
 		string_base<T> &append(const T *c_str) {
 			if (!*c_str) return (*this);
 			unsigned old = len, l = strlength<T>(c_str);
 			if (cap <= (len += l)) {
-				cap += (l + DEF_ALLOC);
+				cap += (l + STR_ALLOC);
 				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return (*this);
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL); 
+#endif
 			memcpy(raw_data + old, c_str, (len - old) * sizeof(T));
 			raw_data[len] = 0x00;
 			return (*this);
@@ -691,13 +706,16 @@ namespace str {
 		*** appends ch's value to this string 
 		*** allocates much more memory if needed
 		*** returns (modified) *this object
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		string_base<T> &append(const T &ch) {
 			if (cap <= (len += 1)) {
-				cap += (1 + DEF_ALLOC);
+				cap += (1 + STR_ALLOC);
 				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return (*this);
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+#endif
 			raw_data[len - 1] = ch;
 			raw_data[len] = 0x00;
 			return (*this);
@@ -709,15 +727,18 @@ namespace str {
 		*** does nothing if 
 			-> count == 0
 		*** returns (eventually modified) *this object
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		string_base<T> &append(const T &ch, unsigned count) {
 			if (!count) return (*this);
 			unsigned o = len;
 			if (cap <= (len += count)) {
-				cap += (count + DEF_ALLOC);
+				cap += (count + STR_ALLOC);
 				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return (*this);
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+#endif
 			for (unsigned i = o; i < (o + count); i++)
 				raw_data[i] = ch;
 			raw_data[len] = 0x00;
@@ -731,6 +752,7 @@ namespace str {
 			-> str's length == 0
 		*** returns (eventually modified) *this object
 		*** Version 1.2: Optimization, using memcpy() now
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		string_base<T> &append(const string_base<T> &str) {
 			if (!str.len) return (*this);
@@ -740,15 +762,17 @@ namespace str {
 			}
 			unsigned o = len, l = str.len;
 			if (cap <= (len += l)) {
-				cap += (l + DEF_ALLOC);
+				cap += (l + STR_ALLOC);
 				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return (*this);
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+#endif
 			memcpy(raw_data + o, str.raw_data, (len - o) * sizeof(T));
 			raw_data[len] = 0x00;
 			return (*this);
 		}
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+#ifdef STR_USE_BINDINGS
 		/*
 		*** string_base<T> &append(const std_string &)
 		*** appends str's value to this string
@@ -771,16 +795,19 @@ namespace str {
 			-> count == 0
 		*** returns (eventually modified) *this object
 		*** Version 1.2: Optimization, using memcpy() now
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		string_base<T> &append(const T *c_str, unsigned count) {
 			if (!*c_str || !count) return (*this);
 			unsigned ac_len = MIN(count, strlength<T>(c_str));
 			unsigned o = len;
 			if (cap <= (len += ac_len)) {
-				cap += (ac_len + DEF_ALLOC);
+				cap += (ac_len + STR_ALLOC);
 				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return (*this);
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+#endif
 			memcpy(raw_data + o, c_str, ac_len * sizeof(T));
 			raw_data[len] = 0x00;
 			return (*this);
@@ -796,6 +823,7 @@ namespace str {
 		*** if "start" is greater than c_str's length, then start = 0
 		*** returns (eventually modified) *this object
 		*** Version 1.2: Optimization, using memcpy() now
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		string_base<T> &append(const T *c_str, unsigned start, unsigned count) {
 			if (!count || !*c_str) return (*this);
@@ -805,10 +833,12 @@ namespace str {
 			if ((start + count) > l) 
 				count = (l - start);
 			if (cap <= (len += count)) {
-				cap += (count + DEF_ALLOC);
+				cap += (count + STR_ALLOC);
 				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return (*this);
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+#endif
 			memcpy(raw_data, c_str + start, count * sizeof(T));
 			raw_data[len] = 0x00;
 			return (*this);
@@ -824,6 +854,7 @@ namespace str {
 		*** if "start" is greater than str's length, then start = 0
 		*** returns (eventually modified) *this object
 		*** Version 1.2: Optimization, using memcpy() now
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		string_base<T> &append(const string_base<T> &str, unsigned start, unsigned count) {
 			if (!count || !str.len) return (*this);
@@ -837,15 +868,17 @@ namespace str {
 			if ((start + count) > l) 
 				count = (l - start);
 			if (cap <= (len += count)) {
-				cap += (count + DEF_ALLOC);
+				cap += (count + STR_ALLOC);
 				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return (*this);
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+#endif
 			memcpy(raw_data, str.raw_data + start, count * sizeof(T));
 			raw_data[len] = 0x00;
 			return (*this);
 		}
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1) 
+#ifdef STR_USE_BINDINGS
 		/*
 		*** string_base<T> &append(const string_base<T> &, unsigned, unsigned)
 		*** appends a substring of "str" (starting at position "start" with a
@@ -871,6 +904,7 @@ namespace str {
 			-> str's length == 0
 		*** returns (eventually modified) *this object
 		*** Version 1.2: Optimizing, using memmove() and memcpy() now
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		string_base<T> &insert(const string_base<T> &str, unsigned pos) {
 			if (pos > len || !str.len) return (*this);
@@ -879,10 +913,12 @@ namespace str {
 				return (*this);
 			}
 			if (cap <= (len += str.len)) {
-				cap += (str.len + DEF_ALLOC);
+				cap += (str.len + STR_ALLOC);
 				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return (*this);
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+#endif
 			memmove(raw_data + (pos + str.len), raw_data + pos, (len - str.len - pos) * sizeof(T));
 			memcpy(raw_data + pos, str.raw_data, str.len * sizeof(T));
 			raw_data[len] = 0x00;
@@ -899,6 +935,7 @@ namespace str {
 		*** if "start" is greater than str's length, then start = 0
 		*** returns (eventually modified) *this object
 		*** Version 1.2: Optimizing, using memmove() and memcpy() now
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		string_base<T> &insert(const string_base<T> &str, unsigned pos, unsigned start, unsigned count) {
 			if (pos > len || !count) return (*this);
@@ -911,16 +948,18 @@ namespace str {
 			if ((start + count) > l) 
 				count = (l - start);
 			if (cap <= (len += count)) {
-				cap += (count + DEF_ALLOC);
+				cap += (count + STR_ALLOC);
 				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return (*this);
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+#endif
 			memmove(raw_data + (pos + count), raw_data + pos, (len - count - pos) * sizeof(T));
 			memcpy(raw_data + pos, str.raw_data + start, count * sizeof(T));
 			raw_data[len] = 0x00;
 			return (*this);
 		}
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+#ifdef STR_USE_BINDINGS
 		/*
 		*** string_base<T> &insert(const std_string &, unsigned, unsigned, unsigned)
 		*** inserts a substring of "str" (starting at position "start" with a length of
@@ -946,6 +985,7 @@ namespace str {
 			-> str's length == 0
 		*** returns (eventually modified) *this object
 		*** Version 1.2: Optimizing, using memmove() and memcpy() now
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		string_base<T> &insert(const string_base<T> &str, unsigned pos, unsigned count) {
 			if (pos > len || !str.len)
@@ -957,16 +997,18 @@ namespace str {
 			if (count > str.len)
 				count -= (count - str.len);
 			if (cap <= (len += count)) {
-				cap += (count + DEF_ALLOC);
+				cap += (count + STR_ALLOC);
 				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return (*this);
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+#endif
 			memmove(raw_data + (pos + count), raw_data + pos, (len - count - pos) * sizeof(T));
 			memcpy(raw_data + pos, str.raw_data, count * sizeof(T));
 			raw_data[len] = 0x00;
 			return (*this);
 		}
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+#ifdef STR_USE_BINDINGS
 		/*
 		*** string_base<T> &insert(const std_string &, unsigned, unsigned)
 		*** inserts the first "count" characters of str's value at position "pos" in this string
@@ -990,15 +1032,18 @@ namespace str {
 			-> first character of c_str's value == 0x00
 		*** returns (eventually modified) *this object
 		*** Version 1.2: Optimizing, using memmove() and memcpy() now
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		string_base<T> &insert(const T *c_str, unsigned pos) {
 			if (pos > len || !*c_str) return (*this);
 			unsigned l = strlength<T>(c_str);
 			if (cap <= (len += l)) {
-				cap += (l + DEF_ALLOC);
+				cap += (l + STR_ALLOC);
 				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return (*this);
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+#endif
 			memmove(raw_data + (pos + l), raw_data + pos, (len - l - pos) * sizeof(T));
 			memcpy(raw_data + pos, c_str, l * sizeof(T));
 			raw_data[len] = 0x00;
@@ -1016,6 +1061,7 @@ namespace str {
 		*** if "start" is greater than str's length, then start = 0
 		*** returns (eventually modified) *this object
 		*** Version 1.2: Optimizing, using memmove() and memcpy() now
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		string_base<T> &insert(const T *c_str, unsigned pos, unsigned start, unsigned count) {
 			if (pos > len || !count || !*c_str) return (*this);
@@ -1025,10 +1071,12 @@ namespace str {
 			if ((start + count) > l) 
 				count = (l - start);
 			if (cap <= (len += count)) {
-				cap += (count + DEF_ALLOC);
+				cap += (count + STR_ALLOC);
 				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return (*this);
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+#endif
 			memmove(raw_data + (pos + count), raw_data + pos, (len - count - pos) * sizeof(T));
 			memcpy(raw_data + pos, c_str + start, count * sizeof(T));
 			raw_data[len] = 0x00;
@@ -1044,6 +1092,7 @@ namespace str {
 			-> first character of c_str's value == 0x00
 		*** returns (eventually modified) *this object
 		*** Version 1.2: Optimizing, using memmove() and memcpy() now
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		string_base<T> &insert(const T *c_str, unsigned pos, unsigned count) {
 			if (pos > len || !count || !*c_str)
@@ -1051,10 +1100,12 @@ namespace str {
 			unsigned l = strlength<T>(c_str);
 			if (count > l) count -= (count - l);
 			if (cap <= (len += count)) {
-				cap += (count + DEF_ALLOC);
+				cap += (count + STR_ALLOC);
 				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return (*this);
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+#endif
 			memmove(raw_data + (pos + count), raw_data + pos, (len - count - pos) * sizeof(T));
 			memcpy(raw_data + pos, c_str, count * sizeof(T));
 			raw_data[len] = 0x00;
@@ -1069,15 +1120,18 @@ namespace str {
 			-> count == 0
 		*** returns (eventually modified) *this object
 		*** Version 1.2: Optimizing, using memmove() now
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		string_base<T> &insert(const T &ch, unsigned pos, unsigned count) {
 			if (pos > len || !count)
 				return (*this);
 			if (cap <= (len += count)) {
-				cap += (count + DEF_ALLOC);
+				cap += (count + STR_ALLOC);
 				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
 			}
-			if (raw_data == NULL) return (*this);
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+#endif
 			memmove(raw_data + (pos + count), raw_data + pos, (len - count - pos) * sizeof(T));
 			for (unsigned i = pos; i < (pos + count); i++)
 				raw_data[i] = ch;
@@ -1092,14 +1146,17 @@ namespace str {
 			-> Given "pos" is greater than current value's length (this->length())
 		*** returns (eventually modified) *this object
 		*** Version 1.2: Optimization, using memmove() now
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		string_base<T> &insert(const T &ch, unsigned pos) {
 			if (pos > len) return (*this);
 			if (cap <= (len += 1)) {
-				cap += (1 + DEF_ALLOC);
+				cap += (1 + STR_ALLOC);
 				raw_data = (T *)realloc(raw_data, (cap * sizeof(T)));
 			}
-			if (raw_data == NULL) return (*this);
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+#endif
 			memmove(raw_data + (pos + 1), raw_data + pos, (len - 1 - pos) * sizeof(T));
 			raw_data[pos] = ch;
 			raw_data[len] = 0x00;
@@ -1275,7 +1332,7 @@ namespace str {
 				++i, --s1count, --s2count;
 			return raw_data[s1pos + i] - str.raw_data[s2pos + i];
 		}
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1) 
+#ifdef STR_USE_BINDINGS
 		/*
 		*** int compare(const std_string &) const
 		*** compares current string value with str's value
@@ -1399,7 +1456,7 @@ namespace str {
 			}
 			return len;
 		}
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+#ifdef STR_USE_BINDINGS
 		/*
 		*** unsigned find(const std_string &, unsigned = 0U)
 		*** returns position of the first occurrence of needle's value in current string value
@@ -1530,7 +1587,7 @@ namespace str {
 			insert(replace, start);
 			return (*this);
 		}
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+#ifdef STR_USE_BINDINGS
 		/*
 		*** string_base<T> &replace(const std_string &, unsigned, unsigned)
 		*** replaces a substring of current string value (starting at position
@@ -1580,7 +1637,7 @@ namespace str {
 			insert(replace, pos);
 			return (*this);
 		}
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+#ifdef STR_USE_BINDINGS
 		/*
 		*** string_base<T> &replace(const std_string &, const std_string &)
 		*** replaces element's value in current string (if found in current string value) with replace's value
@@ -1646,13 +1703,13 @@ namespace str {
 		void push_back(const T &ch) { append(ch); }									/* append ch's value to current value */
 		void push_back(const T *c_str) { append(c_str); }							/* append c_str's value to current value */	
 		void push_back(const string_base<T> &str) { append(str); }					/* append str's value to current value */
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+#ifdef STR_USE_BINDINGS
 		void push_back(const std_string &str) { append(str); }						/* append std::basic_string value */
 #endif
 		void push_front(const T &ch) { insert(ch, 0); }								/* insert ch's value at string's front */
 		void push_front(const T *c_str) { insert(c_str, 0); }						/* insert c_str's value at string's front */
 		void push_front(const string_base<T> &str) { insert(str, 0); }				/* insert str's value at string's front */
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+#ifdef STR_USE_BINDINGS
 		void push_front(const std_string &str) { insert(str, 0); }					/* insert std::basic_string value at front */
 #endif
 		void pop_back(unsigned count = 1) { erase(len - count, count); }			/* delete last "count" characters from string's back */	
@@ -1662,12 +1719,15 @@ namespace str {
 		*** reallocate string with new size of (cap += count)
 		*** doesn't touch data at all
 		*** Version 1.2: Add null-terminator at the end of array
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		void reserve(unsigned count = 1) {										
 			if (!count) return;
 			cap += count;
 			raw_data = (T *)realloc(raw_data, cap * sizeof(T));
-			if (raw_data == NULL) return;
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+#endif
 			raw_data[cap] = 0x00;
 		}
 		/* resize string to "count", fill possible new spaces with '\0' */
@@ -1677,19 +1737,24 @@ namespace str {
 		*** resize string to a length of "count"
 		*** changes capacity to ("count" + 1), performs reallocation
 		*** if "count" > str.length(), fill new spaces with "ch"
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		void resize(unsigned count, T ch) {
 			if (count == len) return;
 			if (count < len) {
 				len = count; cap = len + 1;
 				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
-				if (raw_data == NULL) return;
+#ifdef STR_USE_ASSERTIONS 
+				assert(raw_data != NULL);
+#endif
 				raw_data[len] = 0x00;
 			}
 			else if (count > len) {
 				unsigned o = len; len = count; cap = len + 1;
 				raw_data = (T *)realloc(raw_data, cap * sizeof(T));
-				if (raw_data == NULL) return;
+#ifdef STR_USE_ASSERTIONS 
+				assert(raw_data != NULL);
+#endif
 				for (unsigned i = o; i < count; i++)
 					raw_data[i] = ch;
 				raw_data[len] = 0x00;
@@ -1704,6 +1769,7 @@ namespace str {
 			// a is now "Apple" and b is now "Pear"
 		*** performs an assign operation internally
 		*** Version 1.2: fix function
+		*** Version 1.6: replace cleanup() with delete call
 		*/
 		void swap(string_base<T> &value) {
 			if (this == &value) return;
@@ -1711,7 +1777,7 @@ namespace str {
 				new string_base<T>(value);
 			value.assign(*this);
 			assign(*tmp);
-			tmp->cleanup();
+			delete tmp;
 		}
 		/* 
 		*** void reverse()
@@ -1744,12 +1810,15 @@ namespace str {
 		*** shrink capacity to fit with len
 		*** performs a reallocation
 		*** doesn't touch string's data
+		*** Version 1.6: Added assertions to make debugging the program easier
 		*/
 		void shrink() {
 			if (cap == (len + 1)) return;
 			cap = len + 1;
 			raw_data = (T *)realloc(raw_data, cap * sizeof(T));
-			if (raw_data == NULL) return;
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+#endif
 			raw_data[len] = 0x00;
 		}
 		/*
@@ -1772,12 +1841,12 @@ namespace str {
 		*/
 		void reset() {
 			delete[] raw_data;
-			raw_data = new T[DEF_STRCAP];
+			raw_data = new T[STR_DEFSTRCAP];
 			raw_data[0] = 0x00;
-			len = 0; cap = DEF_STRCAP;
+			len = 0; cap = STR_DEFSTRCAP;
 		}
 
-#ifdef DEF_USE_CLEANUP_FUNCTION
+#ifdef STR_USE_CLEANUP_FUNCTION
 		/*
 		*** void cleanup()
 		*** custom destructor you can call if you 
@@ -1785,7 +1854,7 @@ namespace str {
 		*** this object and all of its members will be invalided after calling this function
 		*** All data is lost when calling this 
 		*** Version 1.1: add this function and remove default destructor
-		*** Version 1.5: define DEF_USE_CLEANUP_FUNCTION to enable this function
+		*** Version 1.5: define STR_USE_CLEANUP_FUNCTION to enable this function
 		*/
 		void cleanup() {
 			delete[] raw_data;
@@ -1848,14 +1917,14 @@ namespace str {
 		string_base<T> &operator =(const T &ch) { return assign(ch, 1); }					/* assign ch's value to current string value */
 		string_base<T> &operator =(const T *c_str) { return assign(c_str); }				/* assign c_str's value to current string value */
 		string_base<T> &operator =(const string_base<T> &str) { return assign(str); }		/* assign a str's value to current string value */
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+#ifdef STR_USE_BINDINGS
 		string_base<T> &operator =(const std_string &str) { return assign(str); }			/* assign std::basic_string value to current string */
 #endif
 
 		string_base<T> &operator +=(const T &ch) { return append(ch); }						/* append (concatenate) ch's value to current string value */
 		string_base<T> &operator +=(const T *c_str) { return append(c_str); }				/* append c_str's value to current string value */
 		string_base<T> &operator +=(const string_base<T> &str) { return append(str); }		/* append str's value to current string value */
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+#ifdef STR_USE_BINDINGS
 		string_base<T> &operator +=(const std_string &str) { return append(str); }			/* append std::basic_string value to current string */
 #endif
 
@@ -1865,13 +1934,13 @@ namespace str {
 
 		bool operator ==(const T *c_str) { return compare(c_str) == 0; }					/* check whether *this == c_str */
 		bool operator ==(const string_base<T> &right) { return compare(right) == 0; }		/* check whether *this == right */
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+#ifdef STR_USE_BINDINGS
 		bool operator ==(const std_string &right) { return compare(right) == 0; }			/* check whether *this == right (std::basic_string) */
 #endif
 
 		bool operator !=(const T *c_str) { return compare(c_str) != 0; }					/* check whether *this != c_str */
 		bool operator !=(const string_base<T> &right) { return compare(right) != 0; }		/* check whether *this != right */
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+#ifdef STR_USE_BINDINGS
 		bool operator !=(const std_string &right) { return compare(right) != 0; }			/* check whether *this != right (std::basic_string) */
 #endif
 
@@ -1909,7 +1978,7 @@ namespace str {
 		inline bool operator >=(const string_base<T> &str) { return compare(str) >= 0; }	/* check whether *this >= str */
 		inline bool operator <=(const string_base<T> &str) { return compare(str) <= 0; }	/* check whether *this <= str */
 
-#if (defined DEF_USE_BINDINGS && DEF_USE_BINDINGS == 1)
+#ifdef STR_USE_BINDINGS
 		inline bool operator >(const std_string &str) { return compare(str) > 0; }			/* check whether *this > str */
 		inline bool operator <(const std_string &str) { return compare(str) < 0; }			/* check whether *this < str */
 		inline bool operator >=(const std_string &str) { return compare(str) >= 0; }		/* check whether *this >= str */
