@@ -17,7 +17,7 @@ A simple and fast C++ string class implementation.
   - C++98 compatibility 
   - bindings to std::basic_string (since Version **1.4**)
   - easy debugging using assertions (since Version **1.6**)
-  - Latest Version: **1.6**
+  - Latest Version: **1.7**
 
 
 ### [F U N C T I O N S]<br>
