@@ -94,6 +94,10 @@
 	Just define some macros somewhere in your code before including this library to affect functionality of it
 	Added an usage example in README.md + added version label to feature list
 	Changed macro prefix from DEF_ to STR_
+*** 1.7:
+	Added copy() and splice() functions (copy = copy chars, splice = move chars)
+	Added STR_CPP11_OR_HIGHER to check whether C++11 or higher is supported
+
 */
 
 /*
@@ -101,7 +105,6 @@
 === TODO								   ===
 === ? - thinking of						   ===
 ==============================================
-copy() and splice() functions (1.7)
 tokenizer ? (1.8)
 case sensitive finding ? (1.9)
 */ 
@@ -112,6 +115,14 @@ case sensitive finding ? (1.9)
 #define STRING_H
 
 #ifdef __cplusplus /* only include this class in a C++ project */
+
+/* 
+Check for C++11 or higher and define a macro to avoid 
+checking this everytime we need it 
+*/
+#if __cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER >= 1900)
+	#define STR_CPP11_OR_HIGHER
+#endif
 
 /*
 *** include this header for several functions 
@@ -160,7 +171,7 @@ capacity allocation for large or for smaller strings
 *** Macro added with version 1.1
 *** Is changed on new release
 */
-#define STR_VERSION "1.6" 
+#define STR_VERSION "1.7" 
 
 /* define NULL macro if it's not defined by default */
 #ifndef NULL
@@ -360,8 +371,13 @@ namespace str {
 		*/
 		~string_base<T>() {
 			delete[] raw_data;
+#ifdef STR_CPP11_OR_HIGHER
+			/* nullptr is a typesafe alternative to NULL */
+			raw_data = nullptr;
+#else
 			/* C++98 support by avoiding nullptr */
 			raw_data = NULL;
+#endif
 		}
 
 		T *data() const { return raw_data; } /* returns C-String value */
@@ -432,6 +448,61 @@ namespace str {
 		iterator end() const { return &raw_data[len]; } /* returns iterator to the ending of string */
 		const_iterator cbegin() const { return &raw_data[0]; } /* returns constant iterator to the beginning of string */
 		const_iterator cend() const { return &raw_data[len]; } /* returns constant iterator to the ending of string */
+
+		/*
+		*** unsigned copy(T *, unsigned, unsigned = 0U)
+		*** copy "size" chars of current string object starting from 
+		position "size" to position "pos" in "buffer"
+		*** doesn't modify current string value
+		*** returns number of chars copied
+		*** does nothing if 
+			-> buffer is NULL
+			-> current string data is NULL
+			-> size == 0
+		*** if buffer is too small, behavior is undefined
+		*** Added with Version 1.7
+		*/
+		unsigned copy(T *buffer, unsigned size, unsigned pos = 0U) {
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+			assert(buffer != NULL);
+#else 
+			if (!buffer || !raw_data || !size)
+				return 0;
+#endif
+			if (pos > len) pos = 0;
+			if ((pos + size) > len) size = (len - pos);
+			memcpy(buffer, raw_data + pos, size * sizeof(T));
+			buffer[size] = 0x00;
+			return size;
+		}
+
+		/*
+		*** string_base<T> &splice(string_base<T> &, unsigned, unsigned, unsigned)
+		*** transfer substring of current string value (starting on position "start" 
+		with a length of "size") and insert it in "buffer" at position "pos"
+		*** transfer means, it deletes the substring portion from current string value
+		*** does nothing if
+			-> current string data == NULL
+			-> size == 0
+			-> current string equals to buffer
+		*** returns (eventually) modified string object
+		*** Added with Version 1.7
+		*/
+		string_base<T> &splice(string_base<T> &buffer, unsigned start, unsigned size, unsigned pos) {
+#ifdef STR_USE_ASSERTIONS 
+			assert(raw_data != NULL);
+			assert(this != &buffer);
+#else 
+			if (!raw_data || !size || this == &buffer) return (*this);
+#endif
+			if (start > len) start = 0;
+			if (pos > buffer.len) pos = 0;
+			if ((pos + size) > len) size = (len - pos);
+			buffer.insert(*this, pos, start, size);
+			erase(start, size);
+			return (*this);
+		}
 
 		/*
 		*** string_base<T> &fill(const T &)
@@ -1858,8 +1929,13 @@ namespace str {
 		*/
 		void cleanup() {
 			delete[] raw_data;
+	#ifdef CPP11_OR_HIGHER
+			/* nullptr is a typesafe alternative to NULL */
+			raw_data = nullptr;
+	#else
 			/* C++98 support by avoiding nullptr */
 			raw_data = NULL;
+	#endif
 			delete this;
 		}
 #endif
@@ -2028,7 +2104,7 @@ namespace str {
 	typedef string_base<char> string;				/* normal string (value_type = char) */
 	typedef string_base<wchar_t> wstring;			/* wide string (value_type = wchar_t) */
 /* only add string16 and string32 if C++11 or higher is supported */
-#if __cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER >= 1900)
+#ifdef STR_CPP11_OR_HIGHER
 	typedef string_base<char16_t> string16;			/* UTF-16 string (value_type = char16_t) */
 	typedef string_base<char32_t> string32;			/* UTF-32 string (value_type = char32_t) */
 #endif

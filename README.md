@@ -35,6 +35,7 @@ A simple and fast C++ string class implementation.
   | cleanup()    | 1 | 0 | void |												deallocate string, use this function as a replacement of "delete"			|
   | clear()      | 1 | 0 | void |												clear string (destroy content)												|
   | compare()    | 10 | 1 - 5 | compare value |									compare string to other strings (or sequences)								|
+  | copy()	     | 1 | 2 - 3 | number of chars copied |							copy chars from current string to buffer (C-Style array)					|
   | c_str()      | 1 | 0 | const string buffer |								return C-String value														|
   | data()       | 1 | 0 | string buffer |										return pointer to internal storage 											|
   | empty()      | 1 | 0 | if string is empty true, else false |				checks whether string is empty												|
@@ -58,6 +59,7 @@ A simple and fast C++ string class implementation.
   | reverse()    | 2 | 0 - 2 | void |											reverse content of string													|
   | shrink()     | 1 | 0 | void |												shrink capacity till it fits with (length() + 1)							|
   | size()       | 1 | 0 | size (of string buffer) in bytes |					returns size, actual storage uses, in bytes (till null-terminator)			|
+  | splice()     | 1 | 4 | modified string object |								transfer chars from current string to another string value					|
   | stod()	  	 | 1 | 0 | string as double |									returns string as double 													|
   | stof()	  	 | 1 | 0 | string as float |									returns string as float														|
   | stol()       | 1 | 0 | string as long |										returns string as long														|
@@ -80,7 +82,7 @@ A simple and fast C++ string class implementation.
 #include <time.h>   /* include this for time measuring */
 /* 
 it's important that the settings 
-(these macros above are defined BEFORE 
+(these macros above) are defined BEFORE 
 the library itself is included, otherwise 
 your settings will not work properly 
 */
