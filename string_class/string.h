@@ -97,6 +97,8 @@
 *** 1.7:
 	Added copy() and splice() functions (copy = copy chars, splice = move chars)
 	Added STR_CPP11_OR_HIGHER to check whether C++11 or higher is supported
+***1.8:
+	Added bindings to std::basic_istream and std::basic_ostream 
 
 */
 
@@ -117,8 +119,8 @@ case sensitive finding ? (1.9)
 #ifdef __cplusplus /* only include this class in a C++ project */
 
 /* 
-Check for C++11 or higher and define a macro to avoid 
-checking this everytime we need it 
+*** Check for C++11 or higher and define a macro to avoid 
+*** checking this everytime we need it 
 */
 #if __cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER >= 1900)
 	#define STR_CPP11_OR_HIGHER
@@ -144,7 +146,8 @@ checking this everytime we need it
 */
 
 #ifdef STR_USE_BINDINGS 
-	#include <string>
+	#include <string>		/* bindings to std::basic_string */
+	#include <iostream>		/* bindings to std::basic_istream and std::basic_ostream */
 #endif
 
 /* 
@@ -171,7 +174,7 @@ capacity allocation for large or for smaller strings
 *** Macro added with version 1.1
 *** Is changed on new release
 */
-#define STR_VERSION "1.7" 
+#define STR_VERSION "1.8" 
 
 /* define NULL macro if it's not defined by default */
 #ifndef NULL
@@ -197,6 +200,19 @@ namespace str {
 	typedef unsigned long long _ull_;		/* unsigned long long */
 	typedef long long _ll_;					/* long long */
 	typedef long double _ld_;				/* long double */
+
+#ifdef STR_USE_BINDINGS 
+	typedef std::basic_ostream<char, std::char_traits<char> > std_ostream;			/* ostream typedef */
+	typedef std::basic_ostream<wchar_t, std::char_traits<wchar_t> > std_wostream;	/* wostream typedef */
+	typedef std::basic_istream<char, std::char_traits<char> > std_istream;			/* istream typedef */
+	typedef std::basic_istream<wchar_t, std::char_traits<wchar_t> > std_wistream;	/* wistream typedef */
+	#ifdef STR_CPP11_OR_HIGHER
+		typedef std::basic_ostream<char16_t, std::char_traits<char16_t>> std_c16ostream;	/* c16ostream typedef */
+		typedef std::basic_ostream<char32_t, std::char_traits<char32_t>> std_c32ostream;	/* c32ostream typedef */
+		typedef std::basic_istream<char16_t, std::char_traits<char16_t>> std_c16istream;	/* c16istream typedef */
+		typedef std::basic_istream<char32_t, std::char_traits<char32_t>> std_c32istream;	/* c32istream typedef */
+	#endif
+#endif
 
 	/* TEMPLATE CLASS string_base<T> */
 	template <typename T>
@@ -2107,6 +2123,25 @@ namespace str {
 #ifdef STR_CPP11_OR_HIGHER
 	typedef string_base<char16_t> string16;			/* UTF-16 string (value_type = char16_t) */
 	typedef string_base<char32_t> string32;			/* UTF-32 string (value_type = char32_t) */
+#endif
+
+/*
+*** the following operator overloads for >> and << are supposed to allow direct input
+*** and output using the std:: input/output streams (cin and cout for example)
+*** (Some of them are only available in C++ and newer since char16_t and char32_t 
+*** didn't even exist in older standards)
+*/
+#ifdef STR_USE_BINDINGS
+	std_ostream &operator <<(std_ostream &stream, str::string &str) { return stream << str.c_str(); }									/* handle ostream output with str::string  */
+	std_wostream &operator <<(std_wostream &stream, str::wstring &str) { return stream << str.c_str(); }								/* handle ostream output with str::wstring */
+	std_istream &operator >>(std_istream &stream, str::string &str) { return stream.get(str.data(), str.capacity()); }					/* handle istream input with str::string32 */
+	std_wistream &operator >>(std_wistream &stream, str::wstring &str) { return stream.get(str.data(), str.capacity()); }				/* handle istream input with str::string16 */
+	#ifdef STR_CPP11_OR_HIGHER
+		std_c16ostream &operator <<(std_c16ostream &stream, str::string16 &str) { return stream << str.c_str(); }						/* handle ostream output with str::string16 */
+		std_c32ostream &operator <<(std_c32ostream &stream, str::string32 &str) { return stream << str.c_str(); }						/* handle ostream output with str::string32 */
+		std_c16istream &operator >>(std_c16istream &stream, str::string16 &str) { return stream.get(str.data(), str.capacity()); }		/* handle istream input with str::string16  */
+		std_c32istream &operator >>(std_c32istream &stream, str::string32 &str) { return stream.get(str.data(), str.capacity()); }		/* handle istream input with str::string32  */
+	#endif
 #endif
 
 }; /* namespace "str" */
