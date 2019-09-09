@@ -13,4 +13,4 @@
 		2. Altered source versions must be marked as such, and must not be misrepresented as being the original software. 
 		3. This notice may not be removed or altered from any source distribution.
 		
-(C) 2018 cocoz1, All rights reserved.
+(C) 2018-2019 cocoz1, All rights reserved.
